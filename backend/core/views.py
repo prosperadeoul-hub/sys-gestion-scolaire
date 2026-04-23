@@ -73,6 +73,22 @@ class TeacherGradesView(APIView):
                 )
         return Response({"status": "success"})
 
+# core/views.py
+class TeacherDashboardSummary(APIView):
+    def get(self, request):
+        # On récupère les infos de base pour l'enseignant
+        try:
+            prof = Professeur.objects.get(user=request.user)
+            matieres = Matiere.objects.filter(professeur=prof)
+            
+            return Response({
+                "nom": request.user.get_full_name(),
+                "nombre_matieres": matieres.count(),
+                "matieres": MatiereSerializer(matieres, many=True).data
+            })
+        except Professeur.DoesNotExist:
+            return Response({"error": "Profil enseignant non trouvé"}, status=404)
+
 
 class AdminStatsView(APIView):
     """Statistics endpoint for the admin overview dashboard."""
@@ -197,6 +213,7 @@ class SeedDemoDataView(APIView):
     Seed database with demo data.
     Runs the seed_demo management command.
     """
+    permission_classes = [AllowAny]
     def post(self, request):
         try:
             from django.core.management import call_command

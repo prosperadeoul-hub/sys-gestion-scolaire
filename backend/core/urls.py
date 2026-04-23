@@ -7,6 +7,7 @@ from .views import (
     CurrentUserView,
     SeedDemoDataView,
     AdminStatsView,
+    TeacherDashboardSummary,
 )
 
 urlpatterns = [
@@ -20,4 +21,5 @@ urlpatterns = [
     path('student/dashboard-stats/', StudentDashboardStats.as_view(), name='student-stats'),
     path('teacher/exams/<int:exam_id>/grades/', TeacherGradesView.as_view(), name='teacher-grades'),
     path('teacher/exams/<int:exam_id>/bulk-save/', TeacherGradesView.as_view(), name='teacher-bulk-save'),
+    path('teacher/dashboard/', TeacherDashboardSummary.as_view(), name='teacher-dashboard'),
 ]
