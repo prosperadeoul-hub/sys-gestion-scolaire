@@ -86,19 +86,23 @@ class StudentCoursesView(APIView):
                     'credits': matiere.coefficient * 10,  # Exemple de calcul de crédits
                 })
             
-            return Response({
-                'etudiant': {
-                    'id': str(student.id),
-                    'nom': f"{student.user.first_name} {student.user.last_name}",
-                    'matricule': student.matricule,
-                    'promotion': str(student.promotion) if student.promotion else None,
-                },
-                'cours': courses_data,
-                'moyenne_generale': round(
-                    sum(c['moyenne'] * c['coefficient'] for c in courses_data if c['moyenne']) /
-                    sum(c['coefficient'] for c in courses_data), 2
-                ) if any(c['moyenne'] for c in courses_data) else None
-            })
+                return Response({
+                 'etudiant': {
+                     'id': str(student.id),
+                     'nom': f"{student.user.first_name} {student.user.last_name}",
+                     'matricule': student.matricule,
+                     'promotion': {
+                         'id': str(student.promotion.id),
+                         'nom': student.promotion.nom,
+                         'annee': student.promotion.annee
+                     } if student.promotion else None,
+                 },
+                 'cours': courses_data,
+                 'moyenne_generale': round(
+                     sum(c['moyenne'] * c['coefficient'] for c in courses_data if c['moyenne']) /
+                     sum(c['coefficient'] for c in courses_data), 2
+                 ) if any(c['moyenne'] for c in courses_data) else None
+                })
             
         except Etudiant.DoesNotExist:
             return Response({"detail": "Profil étudiant non trouvé."}, status=status.HTTP_404_NOT_FOUND)
@@ -107,9 +111,7 @@ class StudentCoursesView(APIView):
 
 
 class StudentScheduleView(APIView):
-    """Rend un emploi du temps simple pour l'étudiant (démo).
-    Construit une semaine en répartissant les matières si il n'existe pas de modèle de planning.
-    """
+    """Rend un emploi du temps pour l'étudiant avec créneaux horaires."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -118,23 +120,72 @@ class StudentScheduleView(APIView):
 
         try:
             student = Etudiant.objects.get(user=request.user)
-            matieres = list(Matiere.objects.filter(promotions=student.promotion))
+            matieres = list(Matiere.objects.filter(promotions=student.promotion).select_related('professeur'))
+            print(f"[DEBUG] Student {student.matricule}, Promotion: {student.promotion.nom if student.promotion else 'None'}, Subjects found: {len(matieres)}")
+            print(f"[DEBUG] Student {student.matricule} has {len(matieres)} subjects for schedule")
 
+            # Jours de la semaine
             days = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
-            schedule = {day: [] for day in days}
+            
+            # Créneaux horaires disponibles (8h - 18h)
+            time_slots = [
+                '08:00 - 10:00',
+                '10:00 - 12:00',
+                '14:00 - 16:00',
+                '16:00 - 18:00',
+            ]
 
-            # Répartir les matières sur la semaine (simple round-robin)
+            # Initialiser l'emploi du temps: {jour: {creneau: cours}}
+            schedule = {day: {slot: None for slot in time_slots} for day in days}
+
+            # Répartition intelligente des matières
+            used_slots = set()
+            
             for i, mat in enumerate(matieres):
-                day = days[i % len(days)]
-                schedule[day].append({
-                    'matiere': mat.nom,
-                    'heure_debut': '08:00',
-                    'heure_fin': '10:00',
-                    'salle': 'A' + str((i % 10) + 1),
-                    'professeur': f"Prof. {mat.professeur.user.last_name}" if mat.professeur else None,
-                })
+                # Trouver un créneau disponible
+                assigned = False
+                for day in days:
+                    if assigned:
+                        break
+                    for slot in time_slots:
+                        slot_key = f"{day}_{slot}"
+                        if slot_key not in used_slots and schedule[day][slot] is None:
+                            # Éviter deux cours de suite le même jour si possible
+                            schedule[day][slot] = {
+                                'matiere': mat.nom,
+                                'code': mat.code,
+                                'coefficient': mat.coefficient,
+                                'categorie': mat.categorie,
+                                'professeur': f"Prof. {mat.professeur.user.last_name}" if mat.professeur else "À définir",
+                                'salle': f"Bâtiment {chr(65 + (i % 4))} - Salle {100 + (i % 20)}",
+                                'heure_debut': slot.split(' - ')[0],
+                                'heure_fin': slot.split(' - ')[1],
+                            }
+                            used_slots.add(slot_key)
+                            assigned = True
+                            break
+                
+                # Si pas de créneau disponible, on met en fin de journée
+                if not assigned:
+                    day = days[i % len(days)]
+                    slot = time_slots[-1]  # dernier créneau
+                    schedule[day][slot] = {
+                        'matiere': mat.nom,
+                        'code': mat.code,
+                        'coefficient': mat.coefficient,
+                        'categorie': mat.categorie,
+                        'professeur': f"Prof. {mat.professeur.user.last_name}" if mat.professeur else "À définir",
+                        'salle': f"Bâtiment {chr(65 + (i % 4))} - Salle {100 + (i % 20)}",
+                        'heure_debut': slot.split(' - ')[0],
+                        'heure_fin': slot.split(' - ')[1],
+                    }
 
-            return Response({'schedule': schedule})
+            return Response({
+                'schedule': schedule,
+                'time_slots': time_slots,
+                'days': days,
+                'total_courses': len(matieres),
+            })
         except Etudiant.DoesNotExist:
             return Response({"detail": "Profil étudiant non trouvé."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:

@@ -1,7 +1,6 @@
-import { useNavigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import api from '../../api/axios';
-import { TrendingUp, Trophy, BookOpen, Wallet, GraduationCap, ClipboardList, Calendar, BarChart3, Target } from 'lucide-react';
+import { TrendingUp, Trophy, BookOpen, GraduationCap, ClipboardList, Calendar, BarChart3, Target, Building2, Users, MapPin } from 'lucide-react';
 import {
   ResponsiveContainer,
   BarChart,
@@ -19,7 +18,6 @@ import {
 } from 'recharts';
 
 const StudentDashboard = ({ stats, user }) => {
-  const navigate = useNavigate();
 
   const getGradeColor = (grade) => {
     if (grade >= 16) return '#10b981';
@@ -48,81 +46,190 @@ const StudentDashboard = ({ stats, user }) => {
   const [gradesData, setGradesData] = useState([]);
   const [performanceTrendData, setPerformanceTrendData] = useState([]);
   const [attendanceData, setAttendanceData] = useState(null);
+  const [promotion, setPromotion] = useState(null);
+  const [schedulePreview, setSchedulePreview] = useState([]);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [scheduleError, setScheduleError] = useState(null);
 
-  useEffect(() => {
-    // Build charts from API where possible. student/courses provides per-matiere averages and exam notes.
-    const buildFromCourses = async () => {
-      try {
-        const resp = await api.get('student/courses/');
-        const cours = resp.data.cours || [];
+   useEffect(() => {
+     // Build charts from API where possible. student/courses provides per-matiere averages and exam notes.
+     const buildFromCourses = async () => {
+       try {
+         const resp = await api.get('student/courses/');
+         const cours = resp.data.cours || [];
 
-        const gData = cours.map(c => ({
-          matiere: (c.nom || '').substring(0, 12) + ((c.nom || '').length > 12 ? '...' : ''),
-          note: c.moyenne != null ? Number(c.moyenne) : 0,
-          coefficient: c.coefficient || 1,
-        }));
-        setGradesData(gData);
+         // Récupérer la promotion depuis les données de l'étudiant
+         if (resp.data.etudiant && resp.data.etudiant.promotion) {
+           setPromotion({
+             nom: resp.data.etudiant.promotion.nom,
+             annee: resp.data.etudiant.promotion.annee
+           });
+         }
 
-        // performanceTrend: aggregate exam dates to compute average per date
-        const examMap = {};
-        cours.forEach(c => {
-          (c.examens || []).forEach(ex => {
-            if (!ex.date) return;
-            const key = ex.date;
-            if (!examMap[key]) examMap[key] = { total: 0, count: 0 };
-            if (ex.note != null) {
-              examMap[key].total += Number(ex.note);
-              examMap[key].count += 1;
-            }
-          });
-        });
-        const perf = Object.keys(examMap).sort().map((date, idx) => ({ periode: date, moyenne: examMap[date].count ? Number((examMap[date].total / examMap[date].count).toFixed(2)) : 0 }));
-        setPerformanceTrendData(perf.slice(-8));
+         const gData = cours.map(c => ({
+           matiere: (c.nom || '').substring(0, 12) + ((c.nom || '').length > 12 ? '...' : ''),
+           note: c.moyenne != null ? Number(c.moyenne) : 0,
+           coefficient: c.coefficient || 1,
+         }));
+         setGradesData(gData);
 
-        // Attendance not tracked in DB currently; use stats.attendance if backend provides it
-        if (stats && stats.attendance) {
-          setAttendanceData(stats.attendance);
-        } else {
-          setAttendanceData(null);
-        }
-      } catch (e) {
-        // fallback: use matieres list from stats for basic grades chart
-        const fallback = stats?.matieres?.map(m => ({ matiere: (m.nom||'').substring(0,12), note: 0, coefficient: m.coefficient || 1 })) || [];
-        setGradesData(fallback);
-        setPerformanceTrendData([]);
-        setAttendanceData(null);
-      }
-    };
+         // performanceTrend: aggregate exam dates to compute average per date
+         const examMap = {};
+         cours.forEach(c => {
+           (c.examens || []).forEach(ex => {
+             if (!ex.date) return;
+             const key = ex.date;
+             if (!examMap[key]) examMap[key] = { total: 0, count: 0 };
+             if (ex.note != null) {
+               examMap[key].total += Number(ex.note);
+               examMap[key].count += 1;
+             }
+           });
+         });
+         const perf = Object.keys(examMap).sort().map((date, idx) => ({ 
+           periode: date, 
+           moyenne: examMap[date].count ? Number((examMap[date].total / examMap[date].count).toFixed(2)) : 0 
+         }));
+         setPerformanceTrendData(perf.slice(-8));
 
-    buildFromCourses();
-  }, [stats]);
+         // Attendance not tracked in DB currently; use stats.attendance if backend provides it
+         if (stats && stats.attendance) {
+           setAttendanceData(stats.attendance);
+         } else {
+           setAttendanceData(null);
+         }
+       } catch (e) {
+         // fallback: use matieres list from stats for basic grades chart
+         const fallback = stats?.matieres?.map(m => ({ 
+           matiere: (m.nom||'').substring(0,12), 
+           note: 0, 
+           coefficient: m.coefficient || 1 
+         })) || [];
+         setGradesData(fallback);
+         setPerformanceTrendData([]);
+         setAttendanceData(null);
+       }
+     };
 
-  const handleActionClick = (path) => {
-    navigate(path);
-  };
+     buildFromCourses();
 
-  return (
+     // Charger un aperçu de l'emploi du temps
+     const fetchSchedulePreview = async () => {
+       setScheduleLoading(true);
+       setScheduleError(null);
+       try {
+         const resp = await api.get('student/schedule/');
+         console.log('Schedule API response:', resp.data);
+         
+         // Extraire les cours des 3 prochains jours
+         const allCourses = [];
+         Object.entries(resp.data.schedule || {}).forEach(([day, slots]) => {
+           Object.entries(slots).forEach(([time, course]) => {
+             if (course) {
+               allCourses.push({ ...course, day, time });
+             }
+           });
+         });
+         console.log('All courses extracted:', allCourses);
+         // Prendre les 3 premiers cours (ou moins)
+         setSchedulePreview(allCourses.slice(0, 3));
+       } catch (e) {
+         console.error('Erreur emploi du temps:', e);
+         setScheduleError(e.message);
+       } finally {
+         setScheduleLoading(false);
+       }
+     };
+
+     fetchSchedulePreview();
+   }, [stats]);
+
+    return (
     <div className="dashboard-content-wrapper">
       <div className="welcome-section">
         <h2>
-          Bonjour, {user?.full_name || user?.username} 👋
+          Bonjour, {user?.full_name || user?.username}
         </h2>
         <p>Tableau de bord Étudiant - Suivez vos performances académiques</p>
       </div>
 
-      {/* <div className="quick-actions">
-        {actionButtons.map((item) => (
-          <button
-            key={item.id}
-            className="quick-action-button"
-            style={{ borderColor: item.color, color: item.color }}
-            onClick={() => handleActionClick(item.path)}
-          >
-            <span className="action-icon">{item.icon}</span>
-            <span>{item.label}</span>
-          </button>
-        ))}
-      </div> */}
+       {/* Section d'action rapide */}
+     {/* <div className="quick-actions">
+        <h3 className="section-title">Actions Rapides</h3>
+        <div className="actions-grid">
+          {actionButtons.map((item) => (
+            <a
+              key={item.id}
+              href={item.path}
+              className="quick-action-link"
+              style={{ borderColor: item.color }}
+            >
+              <div className="action-icon-wrapper" style={{ backgroundColor: item.color }}>
+                {item.icon}
+              </div>
+              <span className="action-label">{item.label}</span>
+            </a>
+          ))}
+        </div>
+      </div>
+      */}
+
+      {/* Aperçu de l'emploi du temps */}
+      {scheduleLoading ? (
+        <div className="schedule-preview-section">
+          <div className="section-header">
+            <h3 className="section-title">
+              <Calendar size={20} />
+              Prochains Cours
+            </h3>
+          </div>
+          <div className="schedule-skeleton">
+            <div className="skeleton-cards">
+              {[1,2,3].map(i => (
+                <div key={i} className="skeleton-card"></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : scheduleError ? (
+        <div className="schedule-preview-section error">
+          <h3 className="section-title">
+            <Calendar size={20} />
+            Prochains Cours
+          </h3>
+          <p>Impossible de charger l'emploi du temps</p>
+        </div>
+      ) : (
+        <div className="schedule-preview-section">
+          <div className="section-header">
+            <h3 className="section-title">
+              <Calendar size={20} />
+              Prochains Cours
+            </h3>
+            <a href="/dashboard/schedule" className="see-all-link">Voir tout</a>
+          </div>
+          {schedulePreview.length > 0 ? (
+            <div className="schedule-preview-cards">
+              {schedulePreview.map((course, idx) => (
+                <div key={idx} className="preview-card">
+                  <div className="preview-day">{course.day.substring(0, 3)}</div>
+                  <div className="preview-time">{course.time}</div>
+                  <div className="preview-course-name">{course.matiere}</div>
+                  <div className="preview-room">
+                    <MapPin size={12} />
+                    {course.salle}
+                  </div>
+                  <div className="preview-code">{course.code}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="no-courses-schedule">
+              <p>Aucun cours prévu pour le moment</p>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="stats-grid">
         <div className="stat-card" style={{ borderTopColor: getGradeColor(stats?.moyenne_generale || 0) }}>
@@ -162,17 +269,19 @@ const StudentDashboard = ({ stats, user }) => {
           </div>
         </div>
 
-        <div className="stat-card" style={{ borderTopColor: '#f59e0b' }}>
-          <div className="stat-icon" style={{ color: '#f59e0b' }}>
-            <Wallet />
-          </div>
-          <div className="stat-info">
-            <div className="stat-value">
-              {stats?.solde_restant ? `${stats.solde_restant} FCFA` : '0 FCFA'}
+        {promotion && (
+          <div className="stat-card" style={{ borderTopColor: '#8b5cf6' }}>
+            <div className="stat-icon" style={{ color: '#8b5cf6' }}>
+              <Building2 />
             </div>
-            <div className="stat-label">Solde à Payer</div>
+            <div className="stat-info">
+              <div className="stat-value" style={{ fontSize: '0.9rem' }}>
+                {promotion.nom}
+              </div>
+              <div className="stat-label">{promotion.annee}</div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="charts-grid">
@@ -255,35 +364,11 @@ const StudentDashboard = ({ stats, user }) => {
             <div style={{ padding: '1rem' }}>Données d'assiduité non disponibles dans la base.</div>
           )}
         </div>
-
-        <div className="chart-card">
-          <div className="chart-header">
-            <Wallet size={20} />
-            <span>État des Paiements</span>
-          </div>
-          <div className="payment-status">
-            <div className="payment-item">
-              <span className="payment-label">Frais de scolarité</span>
-              <span className="payment-amount">{stats?.frais_total ? `${stats.frais_total} FCFA` : 'N/A'}</span>
-            </div>
-            <div className="payment-item">
-              <span className="payment-label">Payé</span>
-              <span className="payment-amount paid">{stats?.frais_payes ? `${stats.frais_payes} FCFA` : 'N/A'}</span>
-            </div>
-            <div className="payment-item">
-              <span className="payment-label">Restant</span>
-              <span className="payment-amount remaining">{stats?.solde_restant ? `${stats.solde_restant} FCFA` : '0 FCFA'}</span>
-            </div>
-            <div className="progress-bar-container">
-              <div className="progress-bar" style={{ width: stats && stats.frais_total ? `${Math.min(100, Math.round(((stats.frais_payes || 0) / stats.frais_total) * 100))}%` : '0%' }}></div>
-            </div>
-          </div>
-        </div>
       </div>
 
       {stats?.matieres && stats.matieres.length > 0 && (
         <div className="content-section">
-          <h3>📚 Vos Matières</h3>
+          <h3>Vos Matières</h3>
           <div className="subjects-table">
             <table className="data-table">
               <thead>

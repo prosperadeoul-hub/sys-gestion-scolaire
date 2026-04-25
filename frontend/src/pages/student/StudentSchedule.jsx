@@ -1,53 +1,47 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Calendar, Clock, ChevronLeft, ChevronRight, Printer, Download } from 'lucide-react';
 import api from '../../api/axios';
-import './StudentCourses.css';
-
-const daysOrder = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+import { Calendar, Clock, MapPin, User, BookOpen, ChevronLeft, ChevronRight, TrendingUp } from 'lucide-react';
+import './StudentSchedule.css';
 
 const StudentSchedule = () => {
-  const { role } = useAuth();
+  const { user, role } = useAuth();
   const [schedule, setSchedule] = useState({});
+  const [timeSlots, setTimeSlots] = useState([]);
+  const [days, setDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [viewMode, setViewMode] = useState('week');
+  const [selectedDay, setSelectedDay] = useState('Lundi');
+  const [stats, setStats] = useState({ totalCourses: 0, daysWithClasses: 0 });
 
   useEffect(() => {
     const fetchSchedule = async () => {
       if (!role || role !== 'ETUDIANT') {
-        setError('Accès refusé : cette page est réservée aux étudiants.');
+        setError("Accès refusé : Cette page est réservée aux étudiants.");
         setLoading(false);
         return;
       }
 
       try {
-        const resp = await api.get('student/schedule/');
-        if (resp.data.schedule) setSchedule(resp.data.schedule);
-        else if (Array.isArray(resp.data)) {
-          const map = {};
-          resp.data.forEach((ev) => {
-            const day = ev.jour || ev.day || 'Lundi';
-            if (!map[day]) map[day] = [];
-            map[day].push(ev);
-          });
-          setSchedule(map);
-        } else setSchedule(resp.data || {});
-      } catch (err) {
-        console.error('Erreur fetch schedule', err);
-        if (err.response && err.response.status === 404) {
-          setError("Emploi du temps indisponible : endpoint backend '/student/schedule/' non trouvé.");
-          setSchedule({
-            Lundi: [{ heure_debut: '08:00', heure_fin: '10:00', matiere: 'Mathématiques', salle: 'A101', professeur: 'M. Dupont' }],
-            Mardi: [{ heure_debut: '10:15', heure_fin: '12:00', matiere: 'Physique', salle: 'B202', professeur: 'Mme. Ndiaye' }],
-            Mercredi: [],
-            Jeudi: [],
-            Vendredi: [],
-            Samedi: [],
-          });
+        const response = await api.get('student/schedule/');
+        setSchedule(response.data.schedule || {});
+        setTimeSlots(response.data.time_slots || []);
+        setDays(response.data.days || []);
+        setStats({
+          totalCourses: response.data.total_courses || 0,
+          daysWithClasses: Object.keys(response.data.schedule || {}).filter(
+            day => (response.data.schedule[day] || []).some(course => course !== null)
+          ).length
+        });
+      } catch (error) {
+        if (error.response) {
+          if (error.response.status === 403) {
+            setError("Accès refusé : Vérifiez que vous êtes connecté en tant qu'étudiant");
+          } else {
+            setError(`Erreur ${error.response.status}: ${error.response.data?.detail || 'Erreur inconnue'}`);
+          }
         } else {
-          setError('Impossible de charger l\'emploi du temps.');
+          setError("Erreur de connexion au serveur");
         }
       } finally {
         setLoading(false);
@@ -57,91 +51,195 @@ const StudentSchedule = () => {
     fetchSchedule();
   }, [role]);
 
-  const handlePrevWeek = () => setWeekOffset((s) => s - 1);
-  const handleNextWeek = () => setWeekOffset((s) => s + 1);
-  const handlePrint = () => window.print();
-  const handleExport = () => {
-    const payload = { schedule };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `schedule_week_${weekOffset || 'current'}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const getDaySchedule = (day) => {
+    return schedule[day] || {};
   };
 
-  const visibleDays = useMemo(() => daysOrder, [weekOffset]);
+  const hasClassesOnDay = (day) => {
+    const daySchedule = getDaySchedule(day);
+    return Object.values(daySchedule).some(course => course !== null);
+  };
 
-  if (loading) return (
-    <div className="loading-container">
-      <div className="loading-spinner"></div>
-      <p>Chargement de l'emploi du temps...</p>
-    </div>
-  );
+  const getCategoryColor = (categorie) => {
+    const colors = {
+      'TECH': '#3b82f6',
+      'SOFT': '#10b981',
+      'LANG': '#f59e0b',
+      'SCIE': '#8b5cf6',
+    };
+    return colors[categorie] || '#6b7280';
+  };
+
+  if (loading) {
+    return (
+      <div className="schedule-container">
+        <div className="loading-state">
+          <div className="spinner"></div>
+          <p>Chargement de l'emploi du temps...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="schedule-container">
+        <div className="error-state">
+          <h2>⚠️ Erreur</h2>
+          <p>{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="student-courses-page">
-      <div className="page-header">
-        <div className="header-content">
-          <div>
-            <h1><Calendar size={28} /> Emploi du temps</h1>
-            <p className="muted">Vue hebdomadaire — consultez, imprimez ou exportez votre planning.</p>
-          </div>
-
-          <div className="schedule-toolbar">
-            <div className="week-nav">
-              <button className="icon-btn" onClick={handlePrevWeek}><ChevronLeft size={18} /></button>
-              <div className="week-label">Semaine {weekOffset === 0 ? 'courante' : weekOffset}</div>
-              <button className="icon-btn" onClick={handleNextWeek}><ChevronRight size={18} /></button>
-            </div>
-
-            <div className="view-actions">
-              <select value={viewMode} onChange={(e) => setViewMode(e.target.value)} className="view-select">
-                <option value="week">Semaine</option>
-                <option value="day">Jour</option>
-              </select>
-              <button className="action-outline" onClick={handleExport}><Download size={16} /> Export</button>
-              <button className="action-primary" onClick={handlePrint}><Printer size={16} /> Imprimer</button>
-            </div>
-          </div>
+    <div className="schedule-container">
+      <div className="schedule-header">
+        <div className="header-info">
+          <h1>
+            <Calendar size={28} />
+            Emploi du Temps
+          </h1>
+          <p className="subtitle">Votre calendrier hebdomadaire</p>
+        </div>
+        
+        <div className="week-navigation">
+          <button className="nav-btn" onClick={() => {
+            const idx = days.indexOf(selectedDay);
+            setSelectedDay(days[(idx - 1 + days.length) % days.length]);
+          }}>
+            <ChevronLeft size={20} />
+          </button>
+          <span className="current-day">{selectedDay}</span>
+          <button className="nav-btn" onClick={() => {
+            const idx = days.indexOf(selectedDay);
+            setSelectedDay(days[(idx + 1) % days.length]);
+          }}>
+            <ChevronRight size={20} />
+          </button>
         </div>
       </div>
 
-      {error && (
-        <div className="error-message" style={{ marginBottom: '1rem' }}>
-          <strong>Info:</strong> {error}
+      {/* Stats rapides */}
+      <div className="schedule-stats">
+        <div className="stat-item">
+          <BookOpen size={20} />
+          <span>{stats.totalCourses} cours this week</span>
+        </div>
+        <div className="stat-item">
+          <TrendingUp size={20} />
+          <span>{stats.daysWithClasses} jours de cours</span>
+        </div>
+      </div>
+
+      {/* Vue journalière détaillée */}
+      <div className="day-schedule-view">
+        <h2 className="day-title">
+          {selectedDay}
+          <span className="day-count">
+            {Object.values(getDaySchedule(selectedDay)).filter(c => c !== null).length} cours
+          </span>
+        </h2>
+
+        {timeSlots.length > 0 ? (
+          <div className="time-slots">
+            {timeSlots.map((slot, idx) => {
+              const course = getDaySchedule(selectedDay)[slot];
+              return (
+                <div key={slot} className={`time-slot ${course ? 'has-course' : 'free'}`}>
+                  <div className="slot-time">
+                    <Clock size={16} />
+                    <span>{slot}</span>
+                  </div>
+                  <div className="slot-content">
+                    {course ? (
+                      <div className="course-slot">
+                        <div 
+                          className="course-header"
+                          style={{ borderLeftColor: getCategoryColor(course.categorie) }}
+                        >
+                          <div className="course-code-badge">{course.code}</div>
+                          <h3>{course.matiere}</h3>
+                          <div className="course-meta">
+                            <span className="professor">
+                              <User size={14} />
+                              {course.professeur}
+                            </span>
+                            <span className="room">
+                              <MapPin size={14} />
+                              {course.salle}
+                            </span>
+                          </div>
+                          <div className="course-times">
+                            <span>{course.heure_debut} - {course.heure_fin}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="free-slot">
+                        <span className="free-label">Créneau libre</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="no-slots">
+            <p>Aucun créneau horaire défini</p>
+          </div>
+        )}
+      </div>
+
+      {/* Vue semaine complète (optionnel - pour écrans larges) */}
+      {days.length > 0 && (
+        <div className="week-grid-container">
+          <h2 className="section-title">Vue Hebdomadaire</h2>
+          <div className="week-grid">
+            <div className="grid-header">
+              <div className="time-column-header">Heure</div>
+              {days.map(day => (
+                <div 
+                  key={day} 
+                  className={`day-header ${selectedDay === day ? 'active' : ''}`}
+                  onClick={() => setSelectedDay(day)}
+                >
+                  {day.substring(0, 3)}
+                </div>
+              ))}
+            </div>
+
+            <div className="grid-body">
+              {timeSlots.map(slot => (
+                <div key={slot} className="grid-row">
+                  <div className="time-label">{slot}</div>
+                  {days.map(day => {
+                    const course = schedule[day]?.[slot];
+                    return (
+                      <div 
+                        key={`${day}-${slot}`} 
+                        className={`grid-cell ${course ? 'occupied' : 'empty'} ${selectedDay === day ? 'selected-day' : ''}`}
+                        style={course ? { backgroundColor: getCategoryColor(course.categorie) + '15' } : {}}
+                      >
+                        {course && (
+                          <div 
+                            className="mini-course"
+                            style={{ borderLeftColor: getCategoryColor(course.categorie) }}
+                          >
+                            <div className="mini-course-code">{course.code}</div>
+                            <div className="mini-course-name">{course.matiere.substring(0, 15)}...</div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
-
-      <div className="content-section">
-        <div className="schedule-grid">
-          {visibleDays.map((day) => (
-            <div key={day} className="schedule-day-card">
-              <div className="schedule-day-header">{day}</div>
-              <div className="schedule-day-body">
-                {(schedule[day] && schedule[day].length > 0) ? (
-                  schedule[day].map((ev, i) => (
-                    <article key={i} className="schedule-event card-elevated">
-                      <div className="event-left">
-                        <div className="event-time"><Clock size={14} /> {ev.heure_debut || ev.start || '—'}</div>
-                        <div className="event-duration">{ev.heure_fin || ev.end || '—'}</div>
-                      </div>
-                      <div className="event-main">
-                        <div className="event-title">{ev.matiere || ev.nom || ev.cours || 'Cours'}</div>
-                        <div className="event-meta">{ev.salle || ev.room || ''} {ev.professeur ? `• ${ev.professeur}` : ''}</div>
-                      </div>
-                      <div className="event-badge">{ev.type || ''}</div>
-                    </article>
-                  ))
-                ) : (
-                  <div className="no-event">Aucun cours</div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 };

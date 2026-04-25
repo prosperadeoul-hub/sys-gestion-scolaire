@@ -83,10 +83,10 @@ const StudentCourses = () => {
                 <Award size={18} />
                 <span>{studentInfo.matricule}</span>
               </div>
-              <div className="info-item">
-                <BookOpen size={18} />
-                <span>{studentInfo.promotion}</span>
-              </div>
+               <div className="info-item">
+                 <BookOpen size={18} />
+                 <span>{studentInfo.promotion?.nom || studentInfo.promotion}</span>
+               </div>
             </div>
           )}
         </div>

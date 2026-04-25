@@ -5,3 +5,4 @@ djangorestframework==3.17.1
 mysqlclient==2.2.8
 sqlparse==0.5.5
 tzdata==2026.1
+Faker==36.1.0

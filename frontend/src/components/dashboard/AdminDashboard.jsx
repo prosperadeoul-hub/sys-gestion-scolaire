@@ -82,16 +82,16 @@ const AdminDashboard = ({ stats, user }) => {
       <div className="welcome-section">
         <h2>
           Bonjour, {user?.full_name || user?.username}    
-          <Hand 
+          {/* <Hand 
             size={24} 
             style={{ transform: 'rotate(15deg)', color: '#fbbf24' }} 
-          />
+          /> */}
         </h2>
 
         <p>Tableau de bord Administrateur - Vue d'ensemble de l'établissement</p>
       </div>
 
-      <div className="quick-actions">
+      {/* <div className="quick-actions">
         {actionButtons.map((item) => (
           <button
             key={item.id}
@@ -103,7 +103,7 @@ const AdminDashboard = ({ stats, user }) => {
             <span>{item.label}</span>
           </button>
         ))}
-      </div>
+      </div> */}
 
       <div className="stats-grid">
         {statCards.map((card, index) => (

@@ -1,0 +1,391 @@
+/* StudentSchedule.css */
+.schedule-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.schedule-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.header-info h1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 28px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0;
+}
+
+.header-info .subtitle {
+  color: #6b7280;
+  font-size: 15px;
+  margin-top: 4px;
+}
+
+.week-navigation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: white;
+  padding: 8px;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.nav-btn {
+  background: #f3f4f6;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.nav-btn:hover {
+  background: #e5e7eb;
+  transform: scale(1.05);
+}
+
+.current-day {
+  font-weight: 600;
+  font-size: 16px;
+  color: #111827;
+  min-width: 100px;
+  text-align: center;
+}
+
+/* Stats */
+.schedule-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.schedule-stats .stat-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: white;
+  padding: 12px 20px;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  font-size: 14px;
+  color: #374151;
+}
+
+.schedule-stats .stat-item svg {
+  color: #3b82f6;
+}
+
+/* Vue journalière */
+.day-schedule-view {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  margin-bottom: 32px;
+}
+
+.day-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 20px 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.day-count {
+  background: #3b82f6;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.time-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.time-slot {
+  display: flex;
+  gap: 16px;
+  min-height: 80px;
+}
+
+.slot-time {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 120px;
+  padding-top: 8px;
+  color: #6b7280;
+  font-size: 13px;
+  font-weight: 500;
+  gap: 4px;
+}
+
+.slot-content {
+  flex: 1;
+}
+
+.course-slot {
+  height: 100%;
+}
+
+.course-header {
+  background: #f8fafc;
+  border-left: 4px solid;
+  border-radius: 8px;
+  padding: 12px 16px;
+  height: 100%;
+  transition: all 0.2s ease;
+}
+
+.course-header:hover {
+  background: #f1f5f9;
+  transform: translateX(4px);
+}
+
+.course-code-badge {
+  display: inline-block;
+  background: #e0e7ff;
+  color: #4338ca;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.course-header h3 {
+  margin: 0 0 8px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.course-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.course-meta span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.course-times {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+.free-slot {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #e5e7eb;
+  border-radius: 8px;
+  background: #fafbfc;
+}
+
+.free-label {
+  color: #9ca3af;
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* Vue grille semaine */
+.week-grid-container {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  overflow-x: auto;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 16px 0;
+}
+
+.week-grid {
+  min-width: 800px;
+}
+
+.grid-header {
+  display: grid;
+  grid-template-columns: 100px repeat(6, 1fr);
+  background: #f8fafc;
+  border-radius: 8px 8px 0 0;
+  overflow: hidden;
+}
+
+.time-column-header,
+.day-header {
+  padding: 12px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 13px;
+  color: #374151;
+  border-right: 1px solid #e5e7eb;
+}
+
+.day-header {
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.day-header:hover {
+  background: #e5e7eb;
+}
+
+.day-header.active {
+  background: #3b82f6;
+  color: white;
+}
+
+.grid-body {
+  border: 1px solid #e5e7eb;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  overflow: hidden;
+}
+
+.grid-row {
+  display: grid;
+  grid-template-columns: 100px repeat(6, 1fr);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.grid-row:last-child {
+  border-bottom: none;
+}
+
+.time-label {
+  padding: 8px;
+  text-align: center;
+  font-size: 12px;
+  color: #6b7280;
+  background: #fafbfc;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.grid-cell {
+  min-height: 60px;
+  padding: 4px;
+  border-right: 1px solid #f3f4f6;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.grid-cell.selected-day {
+  background: #f0f9ff;
+}
+
+.grid-cell.empty:hover {
+  background: #f9fafb;
+}
+
+.mini-course {
+  width: 100%;
+  padding: 6px 8px;
+  background: white;
+  border-left: 3px solid;
+  border-radius: 4px;
+  font-size: 11px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+.mini-course-code {
+  font-weight: 600;
+  color: #4338ca;
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+
+.mini-course-name {
+  color: #374151;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Loading & Error */
+.loading-state,
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e5e7eb;
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-state h2 {
+  color: #ef4444;
+  margin-bottom: 8px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .schedule-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .slot-time {
+    min-width: 80px;
+    font-size: 12px;
+  }
+
+  .course-header h3 {
+    font-size: 14px;
+  }
+}
