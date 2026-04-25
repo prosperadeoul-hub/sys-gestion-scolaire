@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Menu, Search, Bell } from 'lucide-react';
 import './Topbar.css';
 
 const Topbar = ({ onMenuClick, title }) => {
@@ -13,7 +14,7 @@ const Topbar = ({ onMenuClick, title }) => {
     <header className="topbar">
       <div className="topbar-left">
         <button className="menu-btn" onClick={onMenuClick}>
-          ☰
+          <Menu size={22} />
         </button>
         <h1 className="topbar-title">{title}</h1>
       </div>
@@ -28,13 +29,13 @@ const Topbar = ({ onMenuClick, title }) => {
             className="search-input"
           />
           <button type="submit" className="search-btn">
-            🔍
+            <Search size={16} />
           </button>
         </form>
 
         <div className="topbar-actions">
           <button className="action-btn" title="Notifications">
-            🔔
+            <Bell size={20} />
             <span className="notification-badge">3</span>
           </button>
         </div>

@@ -11,19 +11,20 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initAuth = async () => {
       const storedToken = localStorage.getItem('authToken');
-      if (storedToken) {
-        try {
-          const response = await api.get('auth/user/');
-          setUser(response.data);
+      try {
+        if (storedToken) {
+          const response = await api.get('me/');
+          setUser(response.data?.profile ?? null);
           setToken(storedToken);
-        } catch (error) {
-          console.error('Failed to authenticate token:', error);
-          localStorage.removeItem('authToken');
-          setToken(null);
-          setUser(null);
         }
+      } catch (error) {
+        console.error('Failed to authenticate token:', error);
+        localStorage.removeItem('authToken');
+        setToken(null);
+        setUser(null);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     initAuth();

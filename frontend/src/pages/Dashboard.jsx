@@ -1,16 +1,91 @@
 import { useState, useEffect } from 'react';
+import { useRoutes, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import api from '../api/axios';
 import Sidebar from '../components/Sidebar';
 import Topbar from '../components/Topbar';
+import AdminDashboard from '../components/dashboard/AdminDashboard';
+import TeacherDashboard from '../components/dashboard/TeacherDashboard';
+import StudentDashboard from '../components/dashboard/StudentDashboard';
+import UsersManagement from './admin/UsersManagement';
+import CoursesManagement from './admin/CoursesManagement';
+import TeacherCourses from './teacher/TeacherCourses';
+import ClassesManagement from './admin/ClassesManagement';
+import SettingsPage from './admin/SettingsPage';
+import StudentCourses from './student/StudentCourses';
+import TeacherStudents from './teacher/TeacherStudents';
+import TeacherStudentDetail from './teacher/TeacherStudentDetail';
+import StudentGrades from './student/StudentGrades';
+import StudentSchedule from './student/StudentSchedule';
 import './Dashboard.css';
 
 const Dashboard = () => {
-  const { user, role } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth > 768);
+  const { user, role, logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(typeof window !== 'undefined' ? window.innerWidth > 768 : true);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Composants de pages
+  const UsersPage = () => <UsersManagement />;
+  const CoursesPage = () => {
+    if (role === 'ETUDIANT') return <StudentCourses />;
+    if (role === 'ENSEIGNANT') return <TeacherCourses />;
+    return <CoursesManagement />;
+  };
+  const ClassesPage = () => <ClassesManagement />;
+  const SettingsPageComponent = () => <SettingsPage />;
+
+  const StudentsPage = () => <StudentCourses />;
+  const TeacherStudentsPage = () => <TeacherStudents />;
+
+  const GradesPage = () => {
+    if (role === 'ENSEIGNANT') return <TeacherCourses />;
+    return <StudentGrades />;
+  };
+
+  const SchedulePage = () => <StudentSchedule />;
+
+  const renderDashboard = () => {
+    if (loading) {
+      return (
+        <div className="loading-state">
+          <div className="spinner"></div>
+          <p>Chargement des statistiques...</p>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="error-state">
+          <p>{error}</p>
+        </div>
+      );
+    }
+
+    try {
+      switch (role) {
+        case 'ADMIN':
+          return <AdminDashboard stats={stats} user={user} />;
+        case 'ENSEIGNANT':
+          return <TeacherDashboard stats={stats} user={user} />;
+        case 'ETUDIANT':
+          return <StudentDashboard stats={stats} user={user} />;
+        default:
+          return <StudentDashboard stats={stats} user={user} />;
+      }
+    } catch (renderErr) {
+      console.error('Dashboard render error:', renderErr);
+      return (
+        <div className="error-state">
+          <p>Erreur lors de l'affichage du tableau de bord.</p>
+        </div>
+      );
+    }
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -22,179 +97,97 @@ const Dashboard = () => {
   }, []);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchStats = async () => {
       setLoading(true);
       setError('');
-      
+
       try {
         let endpoint;
         switch (role) {
           case 'ADMIN':
             endpoint = 'admin/stats/';
             break;
-          case 'TEACHER':
+          case 'ENSEIGNANT':
             endpoint = 'teacher/dashboard/';
             break;
-          case 'STUDENT':
+          case 'ETUDIANT':
             endpoint = 'student/dashboard-stats/';
             break;
           default:
-            endpoint = 'admin/stats/';
+            endpoint = 'student/dashboard-stats/';
         }
 
         const response = await api.get(endpoint);
-        setStats(response.data);
+        if (!isMounted) return;
+        setStats(response.data ?? null);
       } catch (err) {
         console.error('Failed to fetch stats:', err);
-        setError('Impossible de charger les statistiques. Veuillez réessayer.');
+        if (err?.response?.status === 401 || err?.response?.status === 403) {
+          // force logout and redirect to login
+          try {
+            logout();
+          } catch (e) {
+            console.error('Logout failed:', e);
+          }
+          navigate('/login');
+          return;
+        }
+        if (isMounted) setError('Impossible de charger les statistiques. Veuillez réessayer.');
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
     fetchStats();
-  }, [role]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [role, logout, navigate]);
+
+  const routes = useRoutes([
+    { path: '/', element: renderDashboard() },
+    { path: 'users', element: <UsersPage /> },
+    { path: 'courses', element: <CoursesPage /> },
+    { path: 'classes', element: <ClassesPage /> },
+    { path: 'settings', element: <SettingsPageComponent /> },
+    { path: 'students', element: role === 'ENSEIGNANT' ? <TeacherStudentsPage /> : <StudentsPage /> },
+    { path: 'students/:id', element: role === 'ENSEIGNANT' ? <TeacherStudentDetail /> : <StudentsPage /> },
+    { path: 'grades', element: <GradesPage /> },
+    { path: 'schedule', element: <SchedulePage /> },
+  ]);
 
   const getTitle = () => {
-    switch (role) {
-      case 'admin':
-        return 'Tableau de bord Administrateur';
-      case 'teacher':
-        return 'Tableau de bord Professeur';
-      case 'student':
-        return 'Tableau de bord Étudiant';
+    const path = location.pathname.replace('/dashboard', '');
+    switch (path) {
+      case '/':
+        switch (role) {
+          case 'ADMIN':
+            return 'Tableau de bord Administrateur';
+          case 'ENSEIGNANT':
+            return 'Tableau de bord Professeur';
+          case 'ETUDIANT':
+            return 'Tableau de bord Étudiant';
+          default:
+            return 'Tableau de bord';
+        }
+      case '/users':
+        return 'Gestion des Utilisateurs';
+      case '/courses':
+        return 'Gestion des Cours';
+      case '/classes':
+        return 'Gestion des Classes';
+      case '/settings':
+        return 'Paramètres';
+      case '/students':
+        return 'Gestion des Étudiants';
+      case '/grades':
+        return 'Gestion des Notes';
+      case '/schedule':
+        return 'Emploi du temps';
       default:
         return 'Tableau de bord';
-    }
-  };
-
-  const renderAdminStats = () => (
-    <div className="stats-grid">
-      <div className="stat-card">
-        <div className="stat-icon">👥</div>
-        <div className="stat-info">
-          <div className="stat-value">{stats?.total_users || 0}</div>
-          <div className="stat-label">Utilisateurs</div>
-        </div>
-      </div>
-      <div className="stat-card">
-        <div className="stat-icon">🎓</div>
-        <div className="stat-info">
-          <div className="stat-value">{stats?.total_students || 0}</div>
-          <div className="stat-label">Étudiants</div>
-        </div>
-      </div>
-      <div className="stat-card">
-        <div className="stat-icon">👨‍🏫</div>
-        <div className="stat-info">
-          <div className="stat-value">{stats?.total_teachers || 0}</div>
-          <div className="stat-label">Professeurs</div>
-        </div>
-      </div>
-      <div className="stat-card">
-        <div className="stat-icon">🏫</div>
-        <div className="stat-info">
-          <div className="stat-value">{stats?.total_promotions || 0}</div>
-          <div className="stat-label">Promotions</div>
-        </div>
-      </div>
-      <div className="stat-card">
-        <div className="stat-icon">💰</div>
-        <div className="stat-info">
-          <div className="stat-value">{stats?.total_frais ? `${(stats.total_frais / 1000).toFixed(0)}K` : '0'}</div>
-          <div className="stat-label">Frais Totaux</div>
-        </div>
-      </div>
-      <div className="stat-card">
-        <div className="stat-icon">✅</div>
-        <div className="stat-info">
-          <div className="stat-value">{stats?.total_paye ? `${Math.round((stats.total_paye / stats.total_frais) * 100) || 0}%` : '0%'}</div>
-          <div className="stat-label">Taux de Paiement</div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderTeacherStats = () => (
-    <div className="stats-grid">
-      <div className="stat-card">
-        <div className="stat-icon">📚</div>
-        <div className="stat-info">
-          <div className="stat-value">{stats?.nombre_matieres || 0}</div>
-          <div className="stat-label">Matières</div>
-        </div>
-      </div>
-      <div className="stat-card">
-        <div className="stat-icon">👨‍🏫</div>
-        <div className="stat-info">
-          <div className="stat-value">{stats?.nom || 'Professeur'}</div>
-          <div className="stat-label">Enseignant</div>
-        </div>
-      </div>
-      {stats?.matieres && stats.matieres.length > 0 && (
-        <>
-          <div className="stat-card">
-            <div className="stat-icon">📖</div>
-            <div className="stat-info">
-              <div className="stat-value">{stats.matieres[0]?.nom?.substring(0, 15) || 'N/A'}</div>
-              <div className="stat-label">Matière Principale</div>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon">🔖</div>
-            <div className="stat-info">
-              <div className="stat-value">{stats.matieres[0]?.code || 'N/A'}</div>
-              <div className="stat-label">Code</div>
-            </div>
-          </div>
-        </>
-      )}
-    </div>
-  );
-
-  const renderStudentStats = () => (
-    <div className="stats-grid">
-      <div className="stat-card">
-        <div className="stat-icon">�</div>
-        <div className="stat-info">
-          <div className="stat-value">{stats?.moyenne_generale || 0}/20</div>
-          <div className="stat-label">Moyenne Générale</div>
-        </div>
-      </div>
-      <div className="stat-card">
-        <div className="stat-icon">🏆</div>
-        <div className="stat-info">
-          <div className="stat-value">{stats?.rang || 0}</div>
-          <div className="stat-label">Rang / {stats?.total_etudiants || 0}</div>
-        </div>
-      </div>
-      <div className="stat-card">
-        <div className="stat-icon">📚</div>
-        <div className="stat-info">
-          <div className="stat-value">{stats?.matieres?.length || 0}</div>
-          <div className="stat-label">Matières</div>
-        </div>
-      </div>
-      <div className="stat-card">
-        <div className="stat-icon">💰</div>
-        <div className="stat-info">
-          <div className="stat-value">{stats?.solde_restant ? `${stats.solde_restant} FCFA` : '0 FCFA'}</div>
-          <div className="stat-label">Solde à Payer</div>
-        </div>
-      </div>
-    </div>
-  );
-
-  const renderStats = () => {
-    switch (role) {
-      case 'ADMIN':
-        return renderAdminStats();
-      case 'TEACHER':
-        return renderTeacherStats();
-      case 'STUDENT':
-        return renderStudentStats();
-      default:
-        return renderAdminStats();
     }
   };
 
@@ -206,32 +199,7 @@ const Dashboard = () => {
         <Topbar onMenuClick={() => setSidebarOpen(!sidebarOpen)} title={getTitle()} />
         
         <main className="dashboard-content">
-          <div className="welcome-section">
-            <h2>
-              Bonjour, {user?.first_name || user?.username} 👋
-            </h2>
-            <p>Voici un aperçu de votre activité aujourd'hui.</p>
-          </div>
-
-          {loading ? (
-            <div className="loading-state">
-              <div className="spinner"></div>
-              <p>Chargement des statistiques...</p>
-            </div>
-          ) : error ? (
-            <div className="error-state">
-              <p>{error}</p>
-            </div>
-          ) : (
-            renderStats()
-          )}
-
-          <div className="content-section">
-            <h3>Activités Récentes</h3>
-            <div className="empty-state">
-              <p>Aucune activité récente à afficher.</p>
-            </div>
-          </div>
+          {routes}
         </main>
       </div>
     </div>

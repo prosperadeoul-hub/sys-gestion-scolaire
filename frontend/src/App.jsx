@@ -9,14 +9,17 @@ const PrivateRoute = ({ children }) => {
 
   if (loading) {
     return (
-      <div className="loading-screen">
-        <div className="spinner"></div>
+      <div className="loading-screen" role="status" aria-live="polite">
+        <div className="spinner" aria-hidden></div>
         <p>Chargement...</p>
       </div>
     );
   }
 
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
+  // If not authenticated, redirect to login (defensive)
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+
+  return children;
 };
 
 const AppRoutes = () => {

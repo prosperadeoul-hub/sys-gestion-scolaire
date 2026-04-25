@@ -187,6 +187,9 @@
   }
 
   .sidebar-overlay {
-    display: none;
+    /* Ensure overlay does not block interactions on large screens */
+    display: none !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
   }
 }
