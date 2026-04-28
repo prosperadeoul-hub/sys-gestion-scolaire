@@ -14,7 +14,7 @@ const StudentSchedule = () => {
   const [selectedDay, setSelectedDay] = useState('Lundi');
   const [stats, setStats] = useState({ totalCourses: 0, daysWithClasses: 0 });
 
-  useEffect(() => {
+    useEffect(() => {
     const fetchSchedule = async () => {
       if (!role || role !== 'ETUDIANT') {
         setError("Accès refusé : Cette page est réservée aux étudiants.");
@@ -49,7 +49,7 @@ const StudentSchedule = () => {
     };
 
     fetchSchedule();
-  }, [role]);
+  }, []);
 
   const getDaySchedule = (day) => {
     return schedule[day] || {};
@@ -85,7 +85,7 @@ const StudentSchedule = () => {
     return (
       <div className="schedule-container">
         <div className="error-state">
-          <h2>⚠️ Erreur</h2>
+          <h2>Erreur</h2>
           <p>{error}</p>
         </div>
       </div>

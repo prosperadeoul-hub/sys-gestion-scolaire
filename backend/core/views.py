@@ -5,10 +5,13 @@ from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.contrib.auth import authenticate
 from django.db import transaction
-from django.db.models import Avg, Count, Sum, Window, F
+from django.db.models import Avg, Count, Sum, Window, F, Q
 from django.db.models.functions import Rank
-from .models import Etudiant, Note, Matiere, Examen, Professeur, Promotion, User
-from .serializers import MatiereSerializer, ExamenSerializer, StudentGradeSerializer
+from django.utils import timezone
+import uuid
+from datetime import datetime, date, time, timedelta
+from .models import Etudiant, Note, Matiere, Examen, Professeur, Promotion, User, Salle, Cours
+from .serializers import MatiereSerializer, ExamenSerializer, StudentGradeSerializer, SalleSerializer, CoursSerializer
 
 class StudentDashboardStats(APIView):
     def get(self, request):
@@ -465,7 +468,7 @@ class TeacherStudentDetailView(APIView):
             return Response({"detail": f"Erreur: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
 
-# ==================== AUTHENTICATION VIEWS ====================
+# AUTHENTICATION VIEWS
 
 class TokenAuthView(APIView):
     """
@@ -526,15 +529,13 @@ class CurrentUserView(APIView):
     
     def get(self, request):
         user = request.user
-        
-        # Build user data
+
         user_data = {
             'id': str(user.id),
             'username': user.username,
             'email': user.email,
         }
-        
-        # Get profile data based on role
+    
         profile_data = {
             'id': str(user.id),
             'role': user.role,
@@ -546,7 +547,6 @@ class CurrentUserView(APIView):
             'user': user_data,
             'profile': profile_data
         })
-
 
 class SeedDemoDataView(APIView):
     """
@@ -568,8 +568,7 @@ class SeedDemoDataView(APIView):
                 'detail': str(e)
             }, status=status.HTTP_400_BAD_REQUEST)
 
-
-# ==================== ADMIN MANAGEMENT VIEWS ====================
+# User Management Views
 
 class AdminUsersView(APIView):
     """Admin view for managing users"""
@@ -601,8 +600,6 @@ class AdminUsersView(APIView):
                     profile_data.update({
                         'matricule': etudiant.matricule,
                         'promotion': str(etudiant.promotion) if etudiant.promotion else None,
-                        'frais_total': float(etudiant.frais_scolarite_total),
-                        'frais_payes': float(etudiant.frais_payes),
                     })
                 except Etudiant.DoesNotExist:
                     pass
@@ -620,14 +617,13 @@ class AdminUsersView(APIView):
 
         return Response(user_data)
 
-    def post(self, request):
-        if request.user.role != 'ADMIN':
-            return Response({"detail": "Accès refusé."}, status=status.HTTP_403_FORBIDDEN)
+        def post(self, request):
+            if request.user.role != 'ADMIN':
+                return Response({"detail": "Accès refusé."}, status=status.HTTP_403_FORBIDDEN)
 
         data = request.data
         role = data.get('role')
 
-        # Create base user
         user = User.objects.create_user(
             username=data['username'],
             email=data['email'],
@@ -637,20 +633,40 @@ class AdminUsersView(APIView):
             role=role
         )
 
-        # Create role-specific profile
         if role == 'ETUDIANT':
+            # Génération automatique du matricule si non fourni
+            matricule = data.get('matricule')
+            if not matricule:
+                promotion_id = data.get('promotion_id')
+                if promotion_id:
+                    try:
+                        promotion = Promotion.objects.get(id=promotion_id)
+                        # Compter les étudiants existants de cette promotion
+                        count = Etudiant.objects.filter(promotion=promotion).count() + 1
+                        matricule = f"ETU-{promotion.annee}-{count:03d}"
+                    except Promotion.DoesNotExist:
+                        matricule = f"ETU-{timezone.now().year}-{uuid.uuid4().hex[:6]}"
+                else:
+                    # Sans promotion, générer un matricule unique avec timestamp
+                    matricule = f"ETU-{timezone.now().year}-{uuid.uuid4().hex[:6]}"
+            
             Etudiant.objects.create(
                 user=user,
-                matricule=data['matricule'],
+                matricule=matricule,
                 promotion_id=data.get('promotion_id'),
-                frais_scolarite_total=data.get('frais_total', 0),
-                frais_payes=data.get('frais_payes', 0)
+                # Frais scolaires non renseignés, valeurs par défaut à 0
+                frais_scolarite_total=0,
+                frais_payes=0
             )
         elif role == 'ENSEIGNANT':
-            Professeur.objects.create(
+            prof = Professeur.objects.create(
                 user=user,
                 specialite=data.get('specialite', '')
             )
+            # Lier le professeur aux matières sélectionnées
+            matiere_ids = data.get('matiere_ids', [])
+            if matiere_ids:
+                Matiere.objects.filter(id__in=matiere_ids).update(professeur=prof)
 
         return Response({"status": "success", "user_id": str(user.id)}, status=status.HTTP_201_CREATED)
 
@@ -931,3 +947,251 @@ class AdminSettingsView(APIView):
         # In a real implementation, you'd save these to a Settings model
         # For now, just return success
         return Response({"status": "success", "message": "Settings saved successfully"})
+
+
+# GESTION DES SALLES
+class AdminSalleView(APIView):
+    """Admin view for managing rooms (salles)"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != 'ADMIN':
+            return Response({"detail": "Accès refusé."}, status=status.HTTP_403_FORBIDDEN)
+
+        salles = Salle.objects.all().order_by('nom')
+        serializer = SalleSerializer(salles, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        if request.user.role != 'ADMIN':
+            return Response({"detail": "Accès refusé."}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = SalleSerializer(data=request.data)
+        if serializer.is_valid():
+            salle = serializer.save()
+            return Response({
+                "status": "success",
+                "salle_id": str(salle.id),
+                "salle": SalleSerializer(salle).data
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def put(self, request, salle_id=None):
+        if request.user.role != 'ADMIN':
+            return Response({"detail": "Accès refusé."}, status=status.HTTP_403_FORBIDDEN)
+
+        if not salle_id:
+            return Response({"detail": "Salle ID required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            salle = Salle.objects.get(id=salle_id)
+        except Salle.DoesNotExist:
+            return Response({"detail": "Salle not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = SalleSerializer(salle, data=request.data, partial=True)
+        if serializer.is_valid():
+            salle = serializer.save()
+            return Response({
+                "status": "success",
+                "salle": SalleSerializer(salle).data
+            })
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, salle_id=None):
+        if request.user.role != 'ADMIN':
+            return Response({"detail": "Accès refusé."}, status=status.HTTP_403_FORBIDDEN)
+
+        if not salle_id:
+            return Response({"detail": "Salle ID required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            salle = Salle.objects.get(id=salle_id)
+        except Salle.DoesNotExist:
+            return Response({"detail": "Salle not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Vérifier si la salle est utilisée dans des cours
+        if salle.cours_plannifies.exists():
+            return Response({
+                "detail": "Impossible de supprimer : cette salle est utilisée dans des cours. Veuillez d'abord supprimer les cours associés."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        salle.delete()
+        return Response({"status": "success"})
+
+
+# PROGRAMMATION DES COURS
+class AdminCoursView(APIView):
+    """Admin view for scheduling courses (planning)"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != 'ADMIN':
+            return Response({"detail": "Accès refusé."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Filtres optionnels
+        date_filter = request.GET.get('date')
+        salle_id = request.GET.get('salle_id')
+        enseignant_id = request.GET.get('enseignant_id')
+        promotion_id = request.GET.get('promotion_id')
+
+        cours = Cours.objects.all().select_related(
+            'matiere', 'enseignant', 'enseignant__user', 'promotion', 'salle'
+        ).order_by('date', 'heure_debut')
+
+        if date_filter:
+            cours = cours.filter(date=date_filter)
+        if salle_id:
+            cours = cours.filter(salle_id=salle_id)
+        if enseignant_id:
+            cours = cours.filter(enseignant_id=enseignant_id)
+        if promotion_id:
+            cours = cours.filter(promotion_id=promotion_id)
+
+        serializer = CoursSerializer(cours, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        if request.user.role != 'ADMIN':
+            return Response({"detail": "Accès refusé."}, status=status.HTTP_403_FORBIDDEN)
+
+        serializer = CoursSerializer(data=request.data)
+        if serializer.is_valid():
+            cours = serializer.save()
+            return Response({
+                "status": "success",
+                "cours_id": str(cours.id),
+                "cours": CoursSerializer(cours).data
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def put(self, request, cours_id=None):
+        if request.user.role != 'ADMIN':
+            return Response({"detail": "Accès refusé."}, status=status.HTTP_403_FORBIDDEN)
+
+        if not cours_id:
+            return Response({"detail": "Cours ID required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            cours = Cours.objects.get(id=cours_id)
+        except Cours.DoesNotExist:
+            return Response({"detail": "Cours not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = CoursSerializer(cours, data=request.data, partial=True)
+        if serializer.is_valid():
+            cours = serializer.save()
+            return Response({
+                "status": "success",
+                "cours": CoursSerializer(cours).data
+            })
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, cours_id=None):
+        if request.user.role != 'ADMIN':
+            return Response({"detail": "Accès refusé."}, status=status.HTTP_403_FORBIDDEN)
+
+        if not cours_id:
+            return Response({"detail": "Cours ID required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            cours = Cours.objects.get(id=cours_id)
+        except Cours.DoesNotExist:
+            return Response({"detail": "Cours not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        cours.delete()
+        return Response({"status": "success"})
+
+class DisponibiliteSalleView(APIView):
+    """Vérifie les créneaux disponibles pour une salle à une date donnée"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        salle_id = request.GET.get('salle_id')
+        date = request.GET.get('date')
+
+        if not salle_id or not date:
+            return Response({
+                "detail": "Parameters required: salle_id, date"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            salle = Salle.objects.get(id=salle_id)
+        except Salle.DoesNotExist:
+            return Response({"detail": "Salle not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Récupérer les cours existants pour cette salle à cette date
+        cours_du_jour = Cours.objects.filter(
+            salle=salle,
+            date=date
+        ).order_by('heure_debut')
+
+        # Générer tous les créneaux possibles (8h-18h)
+        from datetime import time, timedelta
+        creneaux = []
+        heure_courante = time(8, 0)
+        while heure_courante < time(18, 0):
+            fin = (datetime.combine(date.today(), heure_courante) + timedelta(hours=2)).time()
+            creneaux.append({
+                'debut': heure_courante.strftime('%H:%M'),
+                'fin': fin.strftime('%H:%M'),
+                'disponible': not cours_du_jour.filter(
+                    heure_debut__lte=heure_courante,
+                    heure_fin__gte=fin
+                ).exists()
+            })
+            heure_courante = fin
+
+        return Response({
+            'salle': SalleSerializer(salle).data,
+            'date': date,
+            'creneaux': creneaux
+        })
+
+
+class DisponibiliteEnseignantView(APIView):
+    """Vérifie les créneaux disponibles pour un enseignant à une date donnée"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        enseignant_id = request.GET.get('enseignant_id')
+        date = request.GET.get('date')
+
+        if not enseignant_id or not date:
+            return Response({
+                "detail": "Parameters required: enseignant_id, date"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            prof = Professeur.objects.get(id=enseignant_id)
+        except Professeur.DoesNotExist:
+            return Response({"detail": "Enseignant not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        # Récupérer les cours de l'enseignant pour cette date
+        cours_du_jour = Cours.objects.filter(
+            enseignant=prof,
+            date=date
+        ).order_by('heure_debut')
+
+        from datetime import time, timedelta
+        creneaux = []
+        heure_courante = time(8, 0)
+        while heure_courante < time(18, 0):
+            fin = (datetime.combine(date.today(), heure_courante) + timedelta(hours=2)).time()
+            creneaux.append({
+                'debut': heure_courante.strftime('%H:%M'),
+                'fin': fin.strftime('%H:%M'),
+                'disponible': not cours_du_jour.filter(
+                    heure_debut__lte=heure_courante,
+                    heure_fin__gte=fin
+                ).exists()
+            })
+            heure_courante = fin
+
+        return Response({
+            'enseignant': {
+                'id': str(prof.id),
+                'nom': prof.user.get_full_name(),
+                'specialite': prof.specialite
+            },
+            'date': date,
+            'creneaux': creneaux
+        })

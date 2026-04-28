@@ -60,7 +60,7 @@ const ClassesManagement = () => {
   };
 
   const handleDelete = async (classId) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer cette classe ?')) {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer cette promotion ?')) {
       try {
         await api.delete(`admin/classes/${classId}/`);
         fetchClasses();
@@ -95,7 +95,7 @@ const ClassesManagement = () => {
       <div className="dashboard-content-wrapper">
         <div className="loading-state">
           <div className="spinner"></div>
-          <p>Chargement des classes...</p>
+          <p>Chargement des promotions...</p>
         </div>
       </div>
     );
@@ -106,9 +106,9 @@ const ClassesManagement = () => {
       <div className="welcome-section">
         <h2>
           <School size={24} style={{ marginRight: '12px' }} />
-          Gestion des Classes
+          Gestion des Promotions
         </h2>
-        <p>Gérer les promotions et classes de l'établissement</p>
+        <p>Gérer les promotions de l'établissement</p>
       </div>
 
       <div className="management-header">
@@ -130,7 +130,7 @@ const ClassesManagement = () => {
           }}
         >
           <Plus size={18} style={{ marginRight: '8px' }} />
-          Ajouter une classe
+          Nouvelle Promotion
         </button>
       </div>
 
@@ -144,7 +144,7 @@ const ClassesManagement = () => {
         <table className="data-table">
           <thead>
             <tr>
-              <th>Classe</th>
+              <th>Promotion</th>
               <th>Année</th>
               <th>Statut</th>
               <th>Actions</th>
@@ -206,7 +206,7 @@ const ClassesManagement = () => {
         {filteredClasses.length === 0 && (
           <div className="empty-state">
             <School size={48} color="#ccc" />
-            <p>Aucune classe trouvée</p>
+            <p>Aucune promotion trouvée</p>
           </div>
         )}
       </div>
@@ -230,7 +230,7 @@ const ClassesManagement = () => {
             <form onSubmit={handleSubmit} className="modal-body">
               <div className="form-grid">
                 <div className="form-group">
-                  <label>Nom de la classe *</label>
+                  <label>Nom de la promotion *</label>
                   <input
                     type="text"
                     value={formData.nom}

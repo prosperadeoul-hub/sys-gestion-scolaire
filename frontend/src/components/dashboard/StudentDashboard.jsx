@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import api from '../../api/axios';
-import { TrendingUp, Trophy, BookOpen, GraduationCap, ClipboardList, Calendar, BarChart3, Target, Building2, Users, MapPin } from 'lucide-react';
+import { TrendingUp, Trophy, BookOpen, GraduationCap, BarChart3, Target, Building2, Users } from 'lucide-react';
 import {
   ResponsiveContainer,
   BarChart,
@@ -37,26 +37,16 @@ const StudentDashboard = ({ stats, user }) => {
 
   const rankInfo = getRankBadge(stats?.rang || 1, stats?.total_etudiants || 1);
 
-  const actionButtons = [
-    { id: 'courses', label: 'Mes Cours', path: '/dashboard/courses', color: '#3b82f6', icon: <BookOpen size={20} /> },
-    { id: 'grades', label: 'Mes Notes', path: '/dashboard/grades', color: '#10b981', icon: <ClipboardList size={20} /> },
-    { id: 'schedule', label: 'Emploi du temps', path: '/dashboard/schedule', color: '#f59e0b', icon: <Calendar size={20} /> },
-  ];
-
   const [gradesData, setGradesData] = useState([]);
   const [performanceTrendData, setPerformanceTrendData] = useState([]);
   const [attendanceData, setAttendanceData] = useState(null);
   const [promotion, setPromotion] = useState(null);
-  const [schedulePreview, setSchedulePreview] = useState([]);
-  const [scheduleLoading, setScheduleLoading] = useState(false);
-  const [scheduleError, setScheduleError] = useState(null);
 
-   useEffect(() => {
-     // Build charts from API where possible. student/courses provides per-matiere averages and exam notes.
-     const buildFromCourses = async () => {
-       try {
-         const resp = await api.get('student/courses/');
-         const cours = resp.data.cours || [];
+  useEffect(() => {
+    const buildFromCourses = async () => {
+      try {
+        const resp = await api.get('student/courses/');
+          const cours = resp.data.cours || [];
 
          // Récupérer la promotion depuis les données de l'étudiant
          if (resp.data.etudiant && resp.data.etudiant.promotion) {
@@ -98,7 +88,7 @@ const StudentDashboard = ({ stats, user }) => {
          } else {
            setAttendanceData(null);
          }
-       } catch (e) {
+        } catch (e) {
          // fallback: use matieres list from stats for basic grades chart
          const fallback = stats?.matieres?.map(m => ({ 
            matiere: (m.nom||'').substring(0,12), 
@@ -109,129 +99,21 @@ const StudentDashboard = ({ stats, user }) => {
          setPerformanceTrendData([]);
          setAttendanceData(null);
        }
-     };
+      };
 
-     buildFromCourses();
+      buildFromCourses();
+    }, [stats]);
 
-     // Charger un aperçu de l'emploi du temps
-     const fetchSchedulePreview = async () => {
-       setScheduleLoading(true);
-       setScheduleError(null);
-       try {
-         const resp = await api.get('student/schedule/');
-         console.log('Schedule API response:', resp.data);
-         
-         // Extraire les cours des 3 prochains jours
-         const allCourses = [];
-         Object.entries(resp.data.schedule || {}).forEach(([day, slots]) => {
-           Object.entries(slots).forEach(([time, course]) => {
-             if (course) {
-               allCourses.push({ ...course, day, time });
-             }
-           });
-         });
-         console.log('All courses extracted:', allCourses);
-         // Prendre les 3 premiers cours (ou moins)
-         setSchedulePreview(allCourses.slice(0, 3));
-       } catch (e) {
-         console.error('Erreur emploi du temps:', e);
-         setScheduleError(e.message);
-       } finally {
-         setScheduleLoading(false);
-       }
-     };
-
-     fetchSchedulePreview();
-   }, [stats]);
-
-    return (
+   return (
     <div className="dashboard-content-wrapper">
       <div className="welcome-section">
         <h2>
           Bonjour, {user?.full_name || user?.username}
         </h2>
         <p>Tableau de bord Étudiant - Suivez vos performances académiques</p>
-      </div>
+       </div>
 
-       {/* Section d'action rapide */}
-     {/* <div className="quick-actions">
-        <h3 className="section-title">Actions Rapides</h3>
-        <div className="actions-grid">
-          {actionButtons.map((item) => (
-            <a
-              key={item.id}
-              href={item.path}
-              className="quick-action-link"
-              style={{ borderColor: item.color }}
-            >
-              <div className="action-icon-wrapper" style={{ backgroundColor: item.color }}>
-                {item.icon}
-              </div>
-              <span className="action-label">{item.label}</span>
-            </a>
-          ))}
-        </div>
-      </div>
-      */}
-
-      {/* Aperçu de l'emploi du temps */}
-      {scheduleLoading ? (
-        <div className="schedule-preview-section">
-          <div className="section-header">
-            <h3 className="section-title">
-              <Calendar size={20} />
-              Prochains Cours
-            </h3>
-          </div>
-          <div className="schedule-skeleton">
-            <div className="skeleton-cards">
-              {[1,2,3].map(i => (
-                <div key={i} className="skeleton-card"></div>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : scheduleError ? (
-        <div className="schedule-preview-section error">
-          <h3 className="section-title">
-            <Calendar size={20} />
-            Prochains Cours
-          </h3>
-          <p>Impossible de charger l'emploi du temps</p>
-        </div>
-      ) : (
-        <div className="schedule-preview-section">
-          <div className="section-header">
-            <h3 className="section-title">
-              <Calendar size={20} />
-              Prochains Cours
-            </h3>
-            <a href="/dashboard/schedule" className="see-all-link">Voir tout</a>
-          </div>
-          {schedulePreview.length > 0 ? (
-            <div className="schedule-preview-cards">
-              {schedulePreview.map((course, idx) => (
-                <div key={idx} className="preview-card">
-                  <div className="preview-day">{course.day.substring(0, 3)}</div>
-                  <div className="preview-time">{course.time}</div>
-                  <div className="preview-course-name">{course.matiere}</div>
-                  <div className="preview-room">
-                    <MapPin size={12} />
-                    {course.salle}
-                  </div>
-                  <div className="preview-code">{course.code}</div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="no-courses-schedule">
-              <p>Aucun cours prévu pour le moment</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="stats-grid">
+       <div className="stats-grid">
         <div className="stat-card" style={{ borderTopColor: getGradeColor(stats?.moyenne_generale || 0) }}>
           <div className="stat-icon" style={{ color: getGradeColor(stats?.moyenne_generale || 0) }}>
             <TrendingUp />

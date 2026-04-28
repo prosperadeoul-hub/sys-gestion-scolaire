@@ -17,6 +17,10 @@ from .views import (
     AdminClassesView,
     AdminProfesseursView,
     AdminSettingsView,
+    AdminSalleView,
+    AdminCoursView,
+    DisponibiliteSalleView,
+    DisponibiliteEnseignantView,
 )
 
 urlpatterns = [
@@ -45,4 +49,12 @@ urlpatterns = [
     path('admin/classes/<uuid:class_id>/', AdminClassesView.as_view(), name='admin-class-detail'),
     path('admin/professeurs/', AdminProfesseursView.as_view(), name='admin-professeurs'),
     path('admin/settings/', AdminSettingsView.as_view(), name='admin-settings'),
+    
+    # Nouveaux endpoints Gestion Salles & Cours
+    path('admin/salles/', AdminSalleView.as_view(), name='admin-salles'),
+    path('admin/salles/<uuid:salle_id>/', AdminSalleView.as_view(), name='admin-salle-detail'),
+    path('admin/cours/', AdminCoursView.as_view(), name='admin-cours'),
+    path('admin/cours/<uuid:cours_id>/', AdminCoursView.as_view(), name='admin-cours-detail'),
+    path('admin/disponibilite/salle/', DisponibiliteSalleView.as_view(), name='dispo-salle'),
+    path('admin/disponibilite/enseignant/', DisponibiliteEnseignantView.as_view(), name='dispo-enseignant'),
 ]

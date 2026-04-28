@@ -9,10 +9,10 @@ import TeacherDashboard from '../components/dashboard/TeacherDashboard';
 import StudentDashboard from '../components/dashboard/StudentDashboard';
 import UsersManagement from './admin/UsersManagement';
 import CoursesManagement from './admin/CoursesManagement';
-import TeacherCourses from './teacher/TeacherCourses';
 import ClassesManagement from './admin/ClassesManagement';
 import SettingsPage from './admin/SettingsPage';
-import StudentCourses from './student/StudentCourses';
+import AdminScheduler from './admin/AdminScheduler';
+import TeacherCourses from './teacher/TeacherCourses';
 import TeacherStudents from './teacher/TeacherStudents';
 import TeacherStudentDetail from './teacher/TeacherStudentDetail';
 import StudentGrades from './student/StudentGrades';
@@ -37,6 +37,7 @@ const Dashboard = () => {
   };
   const ClassesPage = () => <ClassesManagement />;
   const SettingsPageComponent = () => <SettingsPage />;
+  const SchedulerPage = () => <AdminScheduler />;
 
   const StudentsPage = () => <StudentCourses />;
   const TeacherStudentsPage = () => <TeacherStudents />;
@@ -156,6 +157,7 @@ const Dashboard = () => {
     { path: 'students/:id', element: role === 'ENSEIGNANT' ? <TeacherStudentDetail /> : <StudentsPage /> },
     { path: 'grades', element: <GradesPage /> },
     { path: 'schedule', element: <SchedulePage /> },
+    { path: 'scheduler', element: role === 'ADMIN' ? <SchedulerPage /> : <SchedulePage /> },
   ]);
 
   const getTitle = () => {
@@ -184,9 +186,11 @@ const Dashboard = () => {
         return 'Gestion des Étudiants';
       case '/grades':
         return 'Gestion des Notes';
-      case '/schedule':
-        return 'Emploi du temps';
-      default:
+       case '/schedule':
+         return 'Emploi du temps';
+       case '/scheduler':
+         return 'Planning des Cours';
+       default:
         return 'Tableau de bord';
     }
   };

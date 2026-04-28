@@ -94,3 +94,58 @@ class Note(models.Model):
 
     class Meta:
         unique_together = ('etudiant', 'examen')
+
+
+# 8. Salles
+class Salle(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nom = models.CharField(max_length=50, unique=True)
+    capacite = models.IntegerField(default=30, validators=[MinValueValidator(1)])
+    equipement = models.TextField(blank=True, help_text="Équipements disponibles (projecteur, tableau, etc.)")
+    statut = models.CharField(
+        max_length=20,
+        choices=(
+            ('DISPONIBLE', 'Disponible'),
+            ('OCCUPEE', 'Occupée'),
+            ('MAINTENANCE', 'En maintenance'),
+        ),
+        default='DISPONIBLE'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.nom} (Cap: {self.capacite})"
+
+
+# 9. Cours (Planning)
+class Cours(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    matiere = models.ForeignKey(Matiere, on_delete=models.CASCADE, related_name='cours_plannifies')
+    enseignant = models.ForeignKey(Professeur, on_delete=models.CASCADE, related_name='cours_plannifies')
+    promotion = models.ForeignKey(Promotion, on_delete=models.CASCADE, related_name='cours_plannifies')
+    salle = models.ForeignKey(Salle, on_delete=models.CASCADE, related_name='cours_plannifies')
+    date = models.DateField()
+    heure_debut = models.TimeField()
+    heure_fin = models.TimeField()
+    notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['date', 'salle']),
+            models.Index(fields=['date', 'enseignant']),
+        ]
+        # Contrainte d'unicité pour éviter double réservation même créneau
+        constraints = [
+            models.UniqueConstraint(
+                fields=['salle', 'date', 'heure_debut', 'heure_fin'],
+                name='unique_salle_creneau'
+            ),
+            models.UniqueConstraint(
+                fields=['enseignant', 'date', 'heure_debut', 'heure_fin'],
+                name='unique_enseignant_creneau'
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.matiere.nom} - {self.date} {self.heure_debut.strftime('%H:%M')} ({self.salle.nom})"

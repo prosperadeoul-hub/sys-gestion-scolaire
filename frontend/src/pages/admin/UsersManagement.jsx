@@ -10,6 +10,7 @@ const UsersManagement = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [promotions, setPromotions] = useState([]);
+  const [matieres, setMatieres] = useState([]);
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -23,16 +24,25 @@ const UsersManagement = () => {
     // Student fields
     matricule: '',
     promotion_id: '',
-    frais_total: 0,
-    frais_payes: 0,
     // Teacher fields
-    specialite: ''
+    specialite: '',
+    matiere_ids: []
   });
 
   useEffect(() => {
     fetchUsers();
     fetchPromotions();
+    fetchMatieres();
   }, []);
+
+  const fetchMatieres = async () => {
+    try {
+      const response = await api.get('admin/courses/');
+      setMatieres(response.data);
+    } catch (err) {
+      console.error('Error fetching courses:', err);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -62,7 +72,7 @@ const UsersManagement = () => {
       const data = {
         username: formData.username,
         email: formData.email,
-        password: formData.password || 'default123', // Mot de passe par défaut si vide
+        password: formData.password || 'default123',
         first_name: formData.first_name,
         last_name: formData.last_name,
         role: formData.role,
@@ -73,16 +83,14 @@ const UsersManagement = () => {
 
       // Ajouter les champs spécifiques selon le rôle
       if (formData.role === 'ETUDIANT') {
-        data.matricule = formData.matricule;
+        data.matricule = formData.matricule || '';
         data.promotion_id = formData.promotion_id || null;
-        data.frais_total = parseFloat(formData.frais_total) || 0;
-        data.frais_payes = parseFloat(formData.frais_payes) || 0;
       } else if (formData.role === 'ENSEIGNANT') {
         data.specialite = formData.specialite || '';
+        data.matiere_ids = formData.matiere_ids;
       }
 
       if (editingUser) {
-        // Pour l'édition, on n'envoie pas le password s'il est vide
         if (!formData.password) {
           delete data.password;
         }
@@ -115,9 +123,8 @@ const UsersManagement = () => {
       address: user.address || '',
       matricule: user.matricule || '',
       promotion_id: user.promotion || '',
-      frais_total: user.frais_total || 0,
-      frais_payes: user.frais_payes || 0,
-      specialite: user.specialite || ''
+      specialite: user.specialite || '',
+      matiere_ids: [] // Dans l'édition, on ne charge pas les matières pour l'instant
     });
     setShowAddModal(true);
   };
@@ -147,9 +154,8 @@ const UsersManagement = () => {
       address: '',
       matricule: '',
       promotion_id: '',
-      frais_total: 0,
-      frais_payes: 0,
-      specialite: ''
+      specialite: '',
+      matiere_ids: []
     });
   };
 
@@ -411,64 +417,80 @@ const UsersManagement = () => {
                   />
                 </div>
 
-                {/* Champs spécifiques aux étudiants */}
-                {formData.role === 'ETUDIANT' && (
-                  <>
-                    <div className="form-group">
-                      <label>Matricule *</label>
-                      <input
-                        type="text"
-                        value={formData.matricule}
-                        onChange={(e) => setFormData({...formData, matricule: e.target.value})}
-                        required
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Promotion</label>
-                      <select
-                        value={formData.promotion_id}
-                        onChange={(e) => setFormData({...formData, promotion_id: e.target.value})}
-                      >
-                        <option value="">Aucune promotion</option>
-                        {promotions.map(promo => (
-                          <option key={promo.id} value={promo.id}>
-                            {promo.nom} ({promo.annee})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="form-group">
-                      <label>Frais total</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={formData.frais_total}
-                        onChange={(e) => setFormData({...formData, frais_total: parseFloat(e.target.value) || 0})}
-                      />
-                    </div>
-                    <div className="form-group">
-                      <label>Frais payés</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={formData.frais_payes}
-                        onChange={(e) => setFormData({...formData, frais_payes: parseFloat(e.target.value) || 0})}
-                      />
-                    </div>
-                  </>
-                )}
+                 {/* Champs spécifiques aux étudiants */}
+                 {formData.role === 'ETUDIANT' && (
+                   <>
+                     {editingUser ? (
+                       <div className="form-group">
+                         <label>Matricule</label>
+                         <input
+                           type="text"
+                           value={formData.matricule}
+                           disabled
+                         />
+                       </div>
+                     ) : (
+                       <div className="form-group">
+                         <label>Matricule</label>
+                         <input
+                           type="text"
+                           value="Généré automatiquement"
+                           disabled
+                           placeholder="Généré automatiquement"
+                         />
+                       </div>
+                     )}
+                     <div className="form-group">
+                       <label>Promotion</label>
+                       <select
+                         value={formData.promotion_id}
+                         onChange={(e) => setFormData({...formData, promotion_id: e.target.value})}
+                       >
+                         <option value="">Aucune promotion</option>
+                         {promotions.map(promo => (
+                           <option key={promo.id} value={promo.id}>
+                             {promo.nom} ({promo.annee})
+                           </option>
+                         ))}
+                       </select>
+                     </div>
+                   </>
+                 )}
 
-                {/* Champs spécifiques aux enseignants */}
-                {formData.role === 'ENSEIGNANT' && (
-                  <div className="form-group">
-                    <label>Spécialité</label>
-                    <input
-                      type="text"
-                      value={formData.specialite}
-                      onChange={(e) => setFormData({...formData, specialite: e.target.value})}
-                    />
-                  </div>
-                )}
+                 {/* Champs spécifiques aux enseignants */}
+                 {formData.role === 'ENSEIGNANT' && (
+                   <>
+                      <div className="form-group">
+                        <label>Spécialité</label>
+                        <input
+                          type="text"
+                          value={formData.specialite}
+                          onChange={(e) => setFormData({...formData, specialite: e.target.value})}
+                        />
+                      </div>
+                     {!editingUser && (
+                       <div className="form-group">
+                         <label>Matieres enseignées</label>
+                         <select
+                           multiple
+                           value={formData.matiere_ids}
+                           onChange={(e) => {
+                             const selected = Array.from(e.target.selectedOptions, opt => opt.value);
+                             setFormData({...formData, matiere_ids: selected});
+                           }}
+                           style={{ minHeight: '120px' }}
+                         >
+                           {matieres.map(m => (
+                             <option key={m.id} value={m.id}>
+                               {m.nom} ({m.code})
+                             </option>
+                           ))}
+                         </select>
+                         <small>Maintenez Ctrl/Cmd pour sélectionner plusieurs matières</small>
+                       </div>
+                     )}
+                   </>
+                 )}
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Home, Users, BookOpen, Layers, Settings, ClipboardList, Calendar, LogOut, X } from 'lucide-react';
+import { Home, Users, BookOpen, Layers, Settings, ClipboardList, Calendar, LogOut, X, LayoutTemplate } from 'lucide-react';
 import './Sidebar.css';
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -22,7 +22,8 @@ const Sidebar = ({ isOpen, onClose }) => {
           { id: 'dashboard', label: 'Tableau de bord', icon: <Home size={18} />, path: '/' },
           { id: 'users', label: 'Utilisateurs', icon: <Users size={18} />, path: 'users' },
           { id: 'courses', label: 'Cours', icon: <BookOpen size={18} />, path: 'courses' },
-          { id: 'classes', label: 'Classes', icon: <Layers size={18} />, path: 'classes' },
+          { id: 'classes', label: 'Promotions', icon: <Layers size={18} />, path: 'classes' },
+          { id: 'scheduler', label: 'Planning', icon: <LayoutTemplate size={18} />, path: 'scheduler' },
           { id: 'settings', label: 'Paramètres', icon: <Settings size={18} />, path: 'settings' },
         ];
       case 'ENSEIGNANT':
