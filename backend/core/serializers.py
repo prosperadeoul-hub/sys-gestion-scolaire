@@ -86,6 +86,7 @@ class SalleSerializer(serializers.ModelSerializer):
 class CoursSerializer(serializers.ModelSerializer):
     matiere_nom = serializers.ReadOnlyField(source='matiere.nom')
     matiere_code = serializers.ReadOnlyField(source='matiere.code')
+    matiere_categorie = serializers.ReadOnlyField(source='matiere.categorie')
     enseignant_nom = serializers.ReadOnlyField(source='enseignant.user.get_full_name')
     promotion_nom = serializers.ReadOnlyField(source='promotion.nom')
     salle_nom = serializers.ReadOnlyField(source='salle.nom')
@@ -93,7 +94,7 @@ class CoursSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cours
         fields = [
-            'id', 'matiere', 'matiere_nom', 'matiere_code',
+            'id', 'matiere', 'matiere_nom', 'matiere_code', 'matiere_categorie',
             'enseignant', 'enseignant_nom',
             'promotion', 'promotion_nom',
             'salle', 'salle_nom',

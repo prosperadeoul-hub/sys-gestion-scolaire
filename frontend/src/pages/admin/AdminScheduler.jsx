@@ -21,6 +21,9 @@ const AdminScheduler = () => {
   const [editingCours, setEditingCours] = useState(null);
   const [conflictError, setConflictError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [view, setView] = useState('week');
   const [date, setDate] = useState(new Date());
   const [filterSalle, setFilterSalle] = useState('');
@@ -32,21 +35,73 @@ const AdminScheduler = () => {
   const [viewMode, setViewMode] = useState('week');
   const daysOfWeek = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
   const timeSlots = [
-    '07:30 - 09:30', '09:45 - 11:45', '12:00 - 14:00', 
-    '14:15 - 16:15', '16:30 - 18:30', '18:45 - 20:45'
+    { start: '08:00', end: '10:00', label: '08:00 - 10:00', key: '08:00-10:00' },
+    { start: '10:00', end: '12:00', label: '10:00 - 12:00', key: '10:00-12:00' },
+    { start: '14:00', end: '16:00', label: '14:00 - 16:00', key: '14:00-16:00' },
+    { start: '16:00', end: '18:00', label: '16:00 - 18:00', key: '16:00-18:00' },
+    { start: '18:00', end: '20:00', label: '18:00 - 20:00', key: '18:00-20:00' },
   ];
 
-  // Formulaire
-  const [formData, setFormData] = useState({
-    matiere_id: '',
-    enseignant_id: '',
-    promotion_id: '',
-    salle_id: '',
-    date: format(new Date(), 'yyyy-MM-dd'),
-    heure_debut: '08:00',
-    heure_fin: '10:00',
-    notes: ''
-  });
+   // Formulaire
+   const [formData, setFormData] = useState({
+     matiere_id: '',
+     enseignant_id: '',
+     promotion_id: '',
+     salle_id: '',
+     date: format(new Date(), 'yyyy-MM-dd'),
+     heure_debut: '08:00',
+     heure_fin: '10:00',
+     notes: ''
+   });
+
+  // Charger les créneaux disponibles quand la salle ou la date change
+  useEffect(() => {
+    if (formData.salle_id && formData.date) {
+      fetchAvailableSlots(formData.salle_id, formData.date);
+    } else {
+      setAvailableSlots([]);
+    }
+  }, [formData.salle_id, formData.date]);
+
+  // Pré-remplir l'enseignant quand la matière change
+  useEffect(() => {
+    if (formData.matiere_id && !formData.enseignant_id) {
+      const matiere = matieres.find(m => m.id === formData.matiere_id);
+      if (matiere?.professeur?.id) {
+        setFormData(prev => ({ ...prev, enseignant_id: matiere.professeur.id }));
+      }
+    }
+  }, [formData.matiere_id, matieres]);
+
+  // Validation en temps réel des conflits
+  useEffect(() => {
+    const validateConflicts = async () => {
+      if (!formData.salle_id || !formData.date || !formData.enseignant_id || !formData.heure_debut || !formData.heure_fin) {
+        setConflictError('');
+        return;
+      }
+      // Vérifier que l'heure de fin est après l'heure de début
+      if (formData.heure_debut >= formData.heure_fin) {
+        setConflictError("L'heure de fin doit être après l'heure de début");
+        return;
+      }
+      const data = {
+        salle_id: formData.salle_id,
+        date: formData.date,
+        enseignant_id: formData.enseignant_id,
+        heure_debut: formData.heure_debut,
+        heure_fin: formData.heure_fin
+      };
+      const conflicts = await checkConflicts(data, editingCours?.id);
+      if (conflicts.length > 0) {
+        setConflictError(conflicts.join(' | '));
+      } else {
+        setConflictError('');
+      }
+    };
+    const timer = setTimeout(validateConflicts, 500);
+    return () => clearTimeout(timer);
+  }, [formData, editingCours, cours]);
 
   // Filtered courses based on active filters
   const filteredCours = useMemo(() => {
@@ -86,16 +141,19 @@ const AdminScheduler = () => {
 
   const weekData = getWeekCours();
 
-  // Regrouper les cours par créneau pour un jour donné
-  const getCoursByTimeSlot = (dayCours) => {
-    const groups = {};
-    dayCours.forEach(c => {
-      const key = `${c.heure_debut}-${c.heure_fin}`;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(c);
-    });
-    return groups;
-  };
+   // Regrouper les cours par créneau pour un jour donné
+   const getCoursByTimeSlot = (dayCours) => {
+     const groups = {};
+     dayCours.forEach(c => {
+       // On enlève les secondes si elles existent (ex: "08:00:00" -> "08:00")
+       const debut = c.heure_debut?.substring(0, 5) || '';
+       const fin = c.heure_fin?.substring(0, 5) || '';
+       const key = `${debut}-${fin}`;
+       if (!groups[key]) groups[key] = [];
+       groups[key].push(c);
+     });
+     return groups;
+   };
 
   // Couleurs par catégorie
   const getColorForCategorie = (cat) => {
@@ -108,67 +166,68 @@ const AdminScheduler = () => {
     return colors[cat] || '#6b7280';
   };
 
-  useEffect(() => {
-    const fetchAllData = async () => {
-      setLoading(true); // On commence le chargement
-      try {
-        // On lance tous les appels en parallèle pour aller plus vite
-        const [resCours, resSalles, resPro] = await Promise.all([
-          api.get('admin/schedule/'),
-          api.get('admin/rooms/'),
-          api.get('admin/promotions/')
-        ]);
-
-        setCours(resCours.data);
-        setSalles(resSalles.data);
-        setPromotions(resPro.data);
-        
-        setError(null);
-      } catch (err) {
-        console.error("Erreur de chargement:", err);
-        setError("Impossible de charger les données du calendrier.");
-      } finally {
-        // C'EST CETTE LIGNE QUI ENLÈVE LE MESSAGE "CHARGEMENT..."
-        setLoading(false); 
-      }
-    };
-
-    fetchAllData();
-
-  }, []);
-  // Gestion conflits
-  const checkConflicts = async (data, excludeId = null) => {
-    const conflicts = [];
+  const fetchData = async () => {
+    setLoading(true);
     try {
-      const salleConflict = cours.find(c => 
-        c.salle.id === data.salle_id &&
-        c.date === data.date &&
-        c.id !== excludeId &&
-        !(c.heure_fin <= data.heure_debut || c.heure_debut >= data.heure_fin)
-      );
-      if (salleConflict) {
-        conflicts.push(`Salle occupee par "${salleConflict.matiere.nom}" (${salleConflict.heure_debut} - ${salleConflict.heure_fin})`);
-      }
+      const [resCours, resSalles, resEnseignants, resMatieres, resPromotions] = await Promise.all([
+        api.get('admin/cours/'),
+        api.get('admin/salles/'),
+        api.get('admin/professeurs/'),
+        api.get('admin/courses/'),
+        api.get('admin/classes/')
+      ]);
 
-      const profConflict = cours.find(c =>
-        c.enseignant.id === data.enseignant_id &&
-        c.date === data.date &&
-        c.id !== excludeId &&
-        !(c.heure_fin <= data.heure_debut || c.heure_debut >= data.heure_fin)
-      );
-      if (profConflict) {
-        conflicts.push(`Enseignant occupe par "${profConflict.matiere.nom}" (${profConflict.heure_debut} - ${profConflict.heure_fin})`);
-      }
-    } catch (e) {
-      console.error('Conflict check error:', e);
+      setCours(resCours.data || []);
+      setSalles(resSalles.data || []);
+      setEnseignants(resEnseignants.data || []);
+      setMatieres(resMatieres.data || []);
+      setPromotions(resPromotions.data || []);
+      setError(null);
+    } catch (err) {
+      console.error("Erreur de chargement:", err);
+      setError("Impossible de charger les données du calendrier.");
+    } finally {
+      setLoading(false);
     }
-    return conflicts;
   };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+   // Gestion conflits
+   const checkConflicts = async (data, excludeId = null) => {
+     const conflicts = [];
+     try {
+       const salleConflict = cours.find(c => 
+         c.salle.id === data.salle_id &&
+         c.date === data.date &&
+         c.id !== excludeId &&
+         !(c.heure_fin.substring(0, 5) <= data.heure_debut || c.heure_debut.substring(0, 5) >= data.heure_fin)
+       );
+       if (salleConflict) {
+         conflicts.push(`Salle occupee par "${salleConflict.matiere?.nom ?? ''}" (${salleConflict.heure_debut.substring(0, 5)} - ${salleConflict.heure_fin.substring(0, 5)})`);
+       }
+
+       const profConflict = cours.find(c =>
+         c.enseignant.id === data.enseignant_id &&
+         c.date === data.date &&
+         c.id !== excludeId &&
+         !(c.heure_fin.substring(0, 5) <= data.heure_debut || c.heure_debut.substring(0, 5) >= data.heure_fin)
+       );
+       if (profConflict) {
+         conflicts.push(`Enseignant occupe par "${profConflict.matiere?.nom ?? ''}" (${profConflict.heure_debut.substring(0, 5)} - ${profConflict.heure_fin.substring(0, 5)})`);
+       }
+     } catch (e) {
+       console.error('Conflict check error:', e);
+     }
+     return conflicts;
+   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setConflictError('');
     setSuccessMessage('');
+    setSubmitting(true);
 
     try {
       const data = {
@@ -185,15 +244,16 @@ const AdminScheduler = () => {
       const conflicts = await checkConflicts(data, editingCours?.id);
       if (conflicts.length > 0) {
         setConflictError(conflicts.join(' | '));
+        setSubmitting(false);
         return;
       }
 
       if (editingCours) {
         await api.put(`admin/cours/${editingCours.id}/`, data);
-        setSuccessMessage('Cours modifie avec succes');
+        setSuccessMessage('Cours modifié avec succès');
       } else {
         await api.post('admin/cours/', data);
-        setSuccessMessage('Cours cree avec succes');
+        setSuccessMessage('Cours créé avec succès');
       }
 
       await fetchData();
@@ -206,6 +266,8 @@ const AdminScheduler = () => {
       } else {
         setConflictError('Erreur de connexion au serveur');
       }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -229,10 +291,10 @@ const AdminScheduler = () => {
   const openEditModal = (cour) => {
     setEditingCours(cour);
     setFormData({
-      matiere_id: cour.matiere.id,
-      enseignant_id: cour.enseignant.id,
-      promotion_id: cour.promotion.id,
-      salle_id: cour.salle.id,
+      matiere_id: cour.matiere,
+      enseignant_id: cour.enseignant,
+      promotion_id: cour.promotion,
+      salle_id: cour.salle,
       date: cour.date,
       heure_debut: cour.heure_debut,
       heure_fin: cour.heure_fin,
@@ -243,11 +305,30 @@ const AdminScheduler = () => {
     setShowModal(true);
   };
 
+  // Récupérer les créneaux disponibles pour une salle et une date
+  const fetchAvailableSlots = async (salleId, date) => {
+    if (!salleId || !date) {
+      setAvailableSlots([]);
+      return;
+    }
+    setLoadingSlots(true);
+    try {
+      const response = await api.get(`admin/disponibilite/salle/?salle_id=${salleId}&date=${date}`);
+      setAvailableSlots(response.data.creneaux || []);
+    } catch (err) {
+      console.error("Erreur disponibilité salle:", err);
+      setAvailableSlots([]);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
   const closeModal = () => {
     setShowModal(false);
     setEditingCours(null);
     setConflictError('');
     setSuccessMessage('');
+    setAvailableSlots([]);
   };
 
   const handleDelete = async (coursId) => {
@@ -262,17 +343,17 @@ const AdminScheduler = () => {
     }
   };
 
-  // Statistiques
-  const stats = useMemo(() => {
-    const totalCours = filteredCours.length;
-    const totalHeures = filteredCours.reduce((acc, c) => {
-      const [h1, m1] = c.heure_debut.split(':').map(Number);
-      const [h2, m2] = c.heure_fin.split(':').map(Number);
-      return acc + (h2 - h1) + (m2 - m1) / 60;
-    }, 0);
-    const matieresUniques = new Set(filteredCours.map(c => c.matiere.id)).size;
-    return { totalCours, totalHeures: totalHeures.toFixed(1), matieresUniques };
-  }, [filteredCours]);
+   // Statistiques
+   const stats = useMemo(() => {
+     const totalCours = filteredCours.length;
+     const totalHeures = filteredCours.reduce((acc, c) => {
+       const [h1, m1] = c.heure_debut.substring(0, 5).split(':').map(Number);
+       const [h2, m2] = c.heure_fin.substring(0, 5).split(':').map(Number);
+       return acc + (h2 - h1) + (m2 - m1) / 60;
+     }, 0);
+     const matieresUniques = new Set(filteredCours.map(c => c.matiere.id)).size;
+     return { totalCours, totalHeures: totalHeures.toFixed(1), matieresUniques };
+   }, [filteredCours]);
 
   if (loading) {
     return (
@@ -389,21 +470,32 @@ const AdminScheduler = () => {
         </div>
       </div>
 
-      {/* Messages */}
-      {successMessage && (
-        <div className="alert alert-success">
-          <CheckCircle size={18} />
-          {successMessage}
-        </div>
-      )}
-      {conflictError && (
-        <div className="alert alert-error">
-          <AlertCircle size={18} />
-          {conflictError}
-        </div>
-      )}
+       {/* Messages */}
+       {successMessage && (
+         <div className="alert alert-success">
+           <CheckCircle size={18} />
+           {successMessage}
+         </div>
+       )}
+       {conflictError && (
+         <div className="alert alert-error">
+           <AlertCircle size={18} />
+           {conflictError}
+         </div>
+       )}
 
-      {/* Statistiques */}
+       {/* Légende des catégories */}
+       <div className="category-legend">
+         <span className="legend-label">Catégories:</span>
+         {['TECH', 'SOFT', 'LANG', 'SCIE'].map(cat => (
+           <span key={cat} className="legend-item">
+             <span className="legend-dot" style={{ background: getColorForCategorie(cat) }}></span>
+             {cat}
+           </span>
+         ))}
+       </div>
+
+       {/* Statistiques */}
       <div className="stats-cards">
         <div className="stat-card">
           <div className="stat-icon" style={{ background: '#3b82f6' }}>
@@ -449,70 +541,80 @@ const AdminScheduler = () => {
           <h2 className="section-title">Emploi du temps de la semaine</h2>
           <div className="timetable-wrapper">
             <table className="timetable">
-              <thead>
-                <tr>
-                  <th className="time-column-header">Heure</th>
-                  {weekData.map((dayData) => (
-                    <th key={dayData.dayName} className="day-header-col">
-                      <div className="day-header-content">
-                        <div className="day-name">{dayData.dayName}</div>
-                        <div className="day-date">
-                          {format(dayData.date, 'dd MMM', { locale: fr })}
-                        </div>
-                        {dayData.cours.length > 0 && (
-                          <span className="day-count-badge">{dayData.cours.length} cours</span>
-                        )}
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
+               <thead>
+                 <tr>
+                   <th className="time-column-header">Heure</th>
+                   {weekData.map((dayData) => {
+                     const today = new Date();
+                     const isToday = dayData.date.getDate() === today.getDate() &&
+                                     dayData.date.getMonth() === today.getMonth() &&
+                                     dayData.date.getFullYear() === today.getFullYear();
+                     return (
+                       <th key={dayData.dayName} className={`day-header-col ${isToday ? 'today' : ''}`}>
+                         <div className="day-header-content">
+                           <div className="day-name">{dayData.dayName}</div>
+                           <div className="day-date">
+                             {format(dayData.date, 'dd MMM', { locale: fr })}
+                           </div>
+                           {dayData.cours.length > 0 && (
+                             <span className="day-count-badge">{dayData.cours.length} cours</span>
+                           )}
+                         </div>
+                       </th>
+                     );
+                   })}
+                 </tr>
+               </thead>
               <tbody>
-                {timeSlots.map((slot) => {
-                  const slotCoursByDay = weekData.map(dayData => 
-                    dayData.cours.filter(c => c.heure_debut === slot.start && c.heure_fin === slot.end)
-                  );
+                 {timeSlots.map((slot, index) => {
+                    const slotCoursByDay = weekData.map(dayData => 
+                      dayData.cours.filter(c => {
+                        const debut = c.heure_debut?.substring(0, 5) || '';
+                        const fin = c.heure_fin?.substring(0, 5) || '';
+                        return debut === slot.start && fin === slot.end;
+                      })
+                    );
                   const hasAnyCours = slotCoursByDay.some(arr => arr.length > 0);
                   
                   return (
-                    <tr key={slot.key} className={hasAnyCours ? 'has-cours' : 'free-slot'}>
-                      <td className="time-column">
-                        <div className="time-label">
-                          <Clock size={14} />
-                          <span>{slot.start} - {slot.end}</span>
-                        </div>
-                      </td>
+                    <tr key={`slot-${index}`} className={hasAnyCours ? 'has-cours' : 'free-slot'}>
+                       <td className="time-column">
+                         <div className="time-label">
+                           <Clock size={14} />
+                           <span>{slot.label}</span>
+                         </div>
+                       </td>
                       {slotCoursByDay.map((coursList, dayIdx) => (
                         <td key={`${slot.key}-${dayIdx}`} className="time-slot-cell">
-                          {coursList.length > 0 ? (
-                            <div className="cours-in-slot">
-                              {coursList.map((cour) => (
-                                <div 
-                                  key={cour.id}
-                                  className="cours-card-small"
-                                  style={{ borderLeftColor: getColorForCategorie(cour.matiere.categorie) }}
-                                >
-                                  <div className="cours-small-header">
-                                    <span className="cours-small-code">{cour.matiere.code}</span>
-                                    <button onClick={() => openEditModal(cour)} className="edit-small">
-                                      <Edit size={12} />
-                                    </button>
-                                  </div>
-                                  <div className="cours-small-title">{cour.matiere.nom}</div>
-                                  <div className="cours-small-meta">
-                                    <span>{cour.salle.nom}</span>
-                                    <span>{cour.promotion.nom}</span>
-                                  </div>
-                                  <button 
-                                    className="delete-small"
-                                    onClick={() => handleDelete(cour.id)}
-                                  >
-                                    <Trash2 size={12} />
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
+                       {coursList.length > 0 ? (
+                             <div className="cours-in-slot">
+                               {coursList.map((cour) => (
+                                 <div 
+                                   key={cour.id}
+                                   className="cours-card-small"
+                                   style={{ borderLeftColor: getColorForCategorie(cour.matiere_categorie) }}
+                                 >
+                                    <div className="cours-small-header">
+                                      <span className="cours-small-code">{cour.matiere_code ?? ''}</span>
+                                      <button onClick={() => openEditModal(cour)} className="edit-small">
+                                        <Edit size={12} />
+                                      </button>
+                                    </div>
+                                    <div className="cours-small-title">{cour.matiere_nom ?? ''}</div>
+                                    <div className="cours-small-meta">
+                                      <span>{cour.salle_nom ?? ''}</span>
+                                      <span>{cour.promotion_nom ?? ''}</span>
+                                    </div>
+                                   <button 
+                                     className="delete-small"
+                                     onClick={() => handleDelete(cour.id)}
+                                   >
+                                     <Trash2 size={12} />
+                                   </button>
+                                 </div>
+                               ))}
+                             </div>
+                           ) : (
                             <div className="empty-slot"></div>
                           )}
                         </td>
@@ -568,71 +670,75 @@ const AdminScheduler = () => {
         ) : (
           <div className="day-grid">
             {timeSlots.map(slot => {
-              const dayCours = weekData.find(d => d.dayName === selectedDay)?.cours || [];
-              const slotCours = dayCours.filter(c => c.heure_debut === slot.start && c.heure_fin === slot.end);
+                const dayCours = weekData.find(d => d.dayName === selectedDay)?.cours || [];
+                const slotCours = dayCours.filter(c => {
+                  const debut = c.heure_debut?.substring(0, 5) || '';
+                  const fin = c.heure_fin?.substring(0, 5) || '';
+                  return debut === slot.start && fin === slot.end;
+                });
               
               return (
-                <div key={slot.key} className={`day-grid-row ${slotCours.length > 0 ? 'has-cours' : ''}`}>
-                  <div className="day-grid-time">
-                    <Clock size={14} />
-                    <span>{slot.start} - {slot.end}</span>
-                  </div>
+                 <div key={slot.key} className={`day-grid-row ${slotCours.length > 0 ? 'has-cours' : ''}`}>
+                   <div className="day-grid-time">
+                     <Clock size={14} />
+                     <span>{slot.label}</span>
+                   </div>
                   <div className="day-grid-content">
-                    {slotCours.length > 0 ? (
-                      <div className="cours-cards-container">
-                        {slotCours.map(cour => (
-                          <div 
-                            key={cour.id}
-                            className="cour-card-large"
-                            style={{ borderLeftColor: getColorForCategorie(cour.matiere.categorie) }}
-                          >
-                            <div className="cour-card-header">
-                              <div className="cour-main-info">
-                                <span className="cour-badge">{cour.matiere.code}</span>
-                                <h3>{cour.matiere.nom}</h3>
+                     {slotCours.length > 0 ? (
+                       <div className="cours-cards-container">
+                         {slotCours.map(cour => (
+                           <div 
+                             key={cour.id}
+                             className="cour-card-large"
+                             style={{ borderLeftColor: getColorForCategorie(cour.matiere_categorie) }}
+                           >
+                              <div className="cour-card-header">
+                                <div className="cour-main-info">
+                                  <span className="cour-badge">{cour.matiere_code}</span>
+                                  <h3>{cour.matiere_nom}</h3>
+                                </div>
+                                <div className="cour-actions-top">
+                                  <button className="action-btn edit" onClick={() => openEditModal(cour)}>
+                                    <Edit size={16} />
+                                  </button>
+                                  <button className="action-btn delete" onClick={() => handleDelete(cour.id)}>
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
                               </div>
-                              <div className="cour-actions-top">
-                                <button className="action-btn edit" onClick={() => openEditModal(cour)}>
-                                  <Edit size={16} />
-                                </button>
-                                <button className="action-btn delete" onClick={() => handleDelete(cour.id)}>
-                                  <Trash2 size={16} />
-                                </button>
+                              <div className="cour-card-body">
+                                <div className="cour-info-row">
+                                  <span className="info-label">
+                                    <Users size={14} />
+                                    Enseignant
+                                  </span>
+                                  <span>{cour.enseignant_nom}</span>
+                                </div>
+                                <div className="cour-info-row">
+                                  <span className="info-label">
+                                    <MapPin size={14} />
+                                    Salle
+                                  </span>
+                                  <span>{cour.salle_nom}</span>
+                                </div>
+                                <div className="cour-info-row">
+                                  <span className="info-label">
+                                    <BookOpen size={14} />
+                                    Promotion
+                                  </span>
+                                  <span className="promo-tag">{cour.promotion_nom}</span>
+                                </div>
                               </div>
-                            </div>
-                            <div className="cour-card-body">
-                              <div className="cour-info-row">
-                                <span className="info-label">
-                                  <Users size={14} />
-                                  Enseignant
-                                </span>
-                                <span>{cour.enseignant.full_name || cour.enseignant.user?.last_name}</span>
-                              </div>
-                              <div className="cour-info-row">
-                                <span className="info-label">
-                                  <MapPin size={14} />
-                                  Salle
-                                </span>
-                                <span>{cour.salle.nom} (Cap: {cour.salle.capacite})</span>
-                              </div>
-                              <div className="cour-info-row">
-                                <span className="info-label">
-                                  <BookOpen size={14} />
-                                  Promotion
-                                </span>
-                                <span className="promo-tag">{cour.promotion.nom} ({cour.promotion.annee})</span>
-                              </div>
-                            </div>
-                            {cour.notes && (
-                              <div className="cour-notes">
-                                <span className="notes-label">Notes:</span>
-                                <p>{cour.notes}</p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
+                             {cour.notes && (
+                               <div className="cour-notes">
+                                 <span className="notes-label">Notes:</span>
+                                 <p>{cour.notes}</p>
+                               </div>
+                             )}
+                           </div>
+                         ))}
+                       </div>
+                     ) : (
                       <div className="empty-time-slot">
                         <span>Créneau libre</span>
                       </div>
@@ -665,30 +771,36 @@ const AdminScheduler = () => {
                     <option value="">Sélectionner...</option>
                     {matieres.map(m => (
                       <option key={m.id} value={m.id}>
-                        {m.nom} ({m.code}) - Prof: {m.professeur?.user?.last_name || 'N/A'}
+                        {m.nom} ({m.code}) - Prof: {m.professeur?.nom || 'N/A'}
                       </option>
                     ))}
                   </select>
                 </div>
-                <div className="form-group">
-                  <label>Enseignant *</label>
-                  <select
-                    value={formData.enseignant_id}
-                    onChange={(e) => setFormData({...formData, enseignant_id: e.target.value})}
-                    required
-                    disabled={!formData.matiere_id}
-                  >
-                    <option value="">Sélectionner...</option>
-                    {enseignants.filter(e => 
-                      !formData.matiere_id || 
-                      matieres.find(m => m.id === formData.matiere_id && m.professeur?.id === e.id)
-                    ).map(e => (
-                      <option key={e.id} value={e.id}>
-                        {e.full_name || e.user?.first_name + ' ' + e.user?.last_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                 <div className="form-group">
+                   <label>Enseignant *</label>
+                   <select
+                     value={formData.enseignant_id}
+                     onChange={(e) => setFormData({...formData, enseignant_id: e.target.value})}
+                     required
+                     disabled={!formData.matiere_id}
+                   >
+                     <option value="">Sélectionner...</option>
+                     {enseignants.filter(e => 
+                       !formData.matiere_id || 
+                       matieres.find(m => m.id === formData.matiere_id && m.professeur?.id === e.id)
+                     ).map(e => (
+                       <option key={e.id} value={e.id}>
+                         {e.full_name || e.user?.first_name + ' ' + e.user?.last_name}
+                       </option>
+                     ))}
+                   </select>
+                   {formData.matiere_id && enseignants.filter(e => 
+                       !formData.matiere_id || 
+                       matieres.find(m => m.id === formData.matiere_id && m.professeur?.id === e.id)
+                     ).length === 0 && (
+                     <p className="form-error">Aucun enseignant assigné à cette matière</p>
+                   )}
+                 </div>
               </div>
 
               <div className="form-row">
@@ -722,35 +834,75 @@ const AdminScheduler = () => {
                 </div>
               </div>
 
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Date *</label>
-                  <input
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData({...formData, date: e.target.value})}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Heure début *</label>
-                  <input
-                    type="time"
-                    value={formData.heure_debut}
-                    onChange={(e) => setFormData({...formData, heure_debut: e.target.value})}
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Heure fin *</label>
-                  <input
-                    type="time"
-                    value={formData.heure_fin}
-                    onChange={(e) => setFormData({...formData, heure_fin: e.target.value})}
-                    required
-                  />
-                </div>
-              </div>
+               <div className="form-row">
+                 <div className="form-group">
+                   <label>Date *</label>
+                   <input
+                     type="date"
+                     value={formData.date}
+                     onChange={(e) => setFormData({...formData, date: e.target.value})}
+                     required
+                   />
+                 </div>
+                 <div className="form-group">
+                   <label>Heure début *</label>
+                   <input
+                     type="time"
+                     value={formData.heure_debut}
+                     onChange={(e) => setFormData({...formData, heure_debut: e.target.value})}
+                     required
+                   />
+                 </div>
+                 <div className="form-group">
+                   <label>Heure fin *</label>
+                   <input
+                     type="time"
+                     value={formData.heure_fin}
+                     onChange={(e) => setFormData({...formData, heure_fin: e.target.value})}
+                     required
+                   />
+                 </div>
+               </div>
+
+               {availableSlots.length > 0 && (
+                 <div className="available-slots-section">
+                   <label>Créneaux disponibles pour cette salle :</label>
+                   <div className="slots-suggestions">
+                     {availableSlots.map((slot, idx) => (
+                       <button
+                         key={idx}
+                         type="button"
+                         className={`slot-suggestion ${formData.heure_debut === slot.debut && formData.heure_fin === slot.fin ? 'selected' : ''} ${!slot.disponible ? 'disabled' : ''}`}
+                         onClick={() => {
+                           if (slot.disponible) {
+                             setFormData({
+                               ...formData,
+                               heure_debut: slot.debut,
+                               heure_fin: slot.fin
+                             });
+                           }
+                         }}
+                       >
+                         {slot.debut} - {slot.fin}
+                         {!slot.disponible && <span className="unavailable-badge">Occupé</span>}
+                       </button>
+                     ))}
+                     <button
+                       type="button"
+                       className="slot-suggestion manual"
+                       onClick={() => {
+                         setFormData({
+                           ...formData,
+                           heure_debut: '',
+                           heure_fin: ''
+                         });
+                       }}
+                     >
+                       Heures manuelles
+                     </button>
+                   </div>
+                 </div>
+               )}
 
               <div className="form-group full-width">
                 <label>Notes (optionnel)</label>
@@ -762,14 +914,14 @@ const AdminScheduler = () => {
                 />
               </div>
 
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={closeModal}>
-                  Annuler
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  {editingCours ? 'Modifier' : 'Créer le cours'}
-                </button>
-              </div>
+               <div className="modal-footer">
+                 <button type="button" className="btn btn-secondary" onClick={closeModal}>
+                   Annuler
+                 </button>
+                 <button type="submit" className="btn btn-primary" disabled={submitting}>
+                   {submitting ? 'En cours...' : (editingCours ? 'Modifier' : 'Créer le cours')}
+                 </button>
+               </div>
             </form>
           </div>
         </div>

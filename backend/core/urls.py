@@ -35,8 +35,8 @@ urlpatterns = [
     path('student/courses/', StudentCoursesView.as_view(), name='student-courses'),
     path('student/schedule/', StudentScheduleView.as_view(), name='student-schedule'),
     path('teacher/courses/', TeacherCoursesView.as_view(), name='teacher-courses'),
-    path('teacher/exams/<int:exam_id>/grades/', TeacherGradesView.as_view(), name='teacher-grades'),
-    path('teacher/exams/<int:exam_id>/bulk-save/', TeacherGradesView.as_view(), name='teacher-bulk-save'),
+    path('teacher/exams/<uuid:exam_id>/grades/', TeacherGradesView.as_view(), name='teacher-grades'),
+    path('teacher/exams/<uuid:exam_id>/bulk-save/', TeacherGradesView.as_view(), name='teacher-bulk-save'),
     path('teacher/students/<str:student_id>/', TeacherStudentDetailView.as_view(), name='teacher-student-detail'),
     path('teacher/dashboard/', TeacherDashboardSummary.as_view(), name='teacher-dashboard'),
 

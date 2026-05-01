@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Home, Users, BookOpen, Layers, Settings, ClipboardList, Calendar, LogOut, X, LayoutTemplate } from 'lucide-react';
+import { Home, Users, BookOpen, Layers, Settings, ClipboardList, Calendar, LogOut, X, LayoutTemplate, MapPin } from 'lucide-react';
 import './Sidebar.css';
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -23,6 +23,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           { id: 'users', label: 'Utilisateurs', icon: <Users size={18} />, path: 'users' },
           { id: 'courses', label: 'Cours', icon: <BookOpen size={18} />, path: 'courses' },
           { id: 'classes', label: 'Promotions', icon: <Layers size={18} />, path: 'classes' },
+          { id: 'salles', label: 'Salles', icon: <MapPin size={18} />, path: 'salles' },
           { id: 'scheduler', label: 'Planning', icon: <LayoutTemplate size={18} />, path: 'scheduler' },
           { id: 'settings', label: 'Paramètres', icon: <Settings size={18} />, path: 'settings' },
         ];
@@ -37,7 +38,6 @@ const Sidebar = ({ isOpen, onClose }) => {
         return [
           { id: 'dashboard', label: 'Tableau de bord', icon: <Home size={18} />, path: '/' },
           { id: 'courses', label: 'Mes Cours', icon: <BookOpen size={18} />, path: 'courses' },
-          { id: 'grades', label: 'Mes Notes', icon: <ClipboardList size={18} />, path: 'grades' },
           { id: 'schedule', label: 'Emploi du temps', icon: <Calendar size={18} />, path: 'schedule' },
         ];
       default:

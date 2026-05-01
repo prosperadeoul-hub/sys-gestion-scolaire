@@ -241,23 +241,32 @@ class TeacherGradesView(APIView):
             with transaction.atomic(): # Si une note échoue, rien n'est sauvegardé
                 for item in grades_data:
                     etudiant_id = item.get('etudiant_id')
+                    valeur = item.get('valeur')
+                    commentaire = item.get('commentaire', '')
+
                     # ensure student belongs to a promotion linked to this matiere
                     if not Etudiant.objects.filter(id=etudiant_id, promotion__in=examen.matiere.promotions.all()).exists():
                         return Response({"detail": f"Étudiant {etudiant_id} non autorisé pour cet examen."}, status=status.HTTP_403_FORBIDDEN)
 
-                    Note.objects.update_or_create(
-                        etudiant_id=etudiant_id,
-                        examen=examen,
-                        defaults={
-                            'valeur': item['valeur'],
-                            'commentaire': item.get('commentaire', '')
-                        }
-                    )
+                    # Si la valeur est None ou vide, on supprime la note si elle existe
+                    if valeur is None or valeur == '':
+                        Note.objects.filter(etudiant_id=etudiant_id, examen=examen).delete()
+                    else:
+                        Note.objects.update_or_create(
+                            etudiant_id=etudiant_id,
+                            examen=examen,
+                            defaults={
+                                'valeur': float(valeur),
+                                'commentaire': commentaire
+                            }
+                        )
             return Response({"status": "success"})
         except Examen.DoesNotExist:
             return Response({"detail": "Examen non trouvé."}, status=status.HTTP_404_NOT_FOUND)
         except Professeur.DoesNotExist:
             return Response({"detail": "Profil enseignant non trouvé."}, status=status.HTTP_404_NOT_FOUND)
+        except (ValueError, TypeError) as e:
+            return Response({"detail": f"Valeur de note invalide: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class TeacherCoursesView(APIView):

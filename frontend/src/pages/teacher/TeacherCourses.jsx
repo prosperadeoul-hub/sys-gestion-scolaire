@@ -1,171 +1,164 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { BookOpen, Users, FileText, Search, Save, Download, Printer, ChevronLeft, ChevronRight } from 'lucide-react';
+import { BookOpen, Users, FileText, Search, Save, Download, Printer, ChevronLeft, ChevronRight, Plus, Edit, Trash2, Calendar, Clock, AlertCircle, CheckCircle, X, BarChart3 } from 'lucide-react';
 import api from '../../api/axios';
-import '../student/StudentCourses.css';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import './TeacherCourses.css';
+
+const ITEMS_PER_PAGE = 10;
 
 const TeacherCourses = () => {
   const { user, role } = useAuth();
+  
+  // États principaux
   const [courses, setCourses] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
   const [promotions, setPromotions] = useState([]);
   const [matieres, setMatieres] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  
+  // Filtres
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedPromotionId, setSelectedPromotionId] = useState('');
   const [selectedMatiereId, setSelectedMatiereId] = useState('');
-  const [selectedCourseId, setSelectedCourseId] = useState(null);
-  const [selectedExamId, setSelectedExamId] = useState(null);
-  const [gradesState, setGradesState] = useState({}); // {examId: { studentId: note }}
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  
+  // Sélection courante
+  const [selectedCourseId, setSelectedCourseId] = useState('');
+  const [selectedExamId, setSelectedExamId] = useState('');
+  
+  // Notes
+  const [gradesState, setGradesState] = useState({});
+  const [savingGrades, setSavingGrades] = useState(false);
+  
+  // Pagination pour les cours
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(ITEMS_PER_PAGE);
+  
+  // Tri
   const [sortBy, setSortBy] = useState('nom');
   const [sortDir, setSortDir] = useState('asc');
+  
+  // Modal examen
+  const [showExamModal, setShowExamModal] = useState(false);
+  const [editingExam, setEditingExam] = useState(null);
+  const [examForm, setExamForm] = useState({ nom: '', date: '' });
 
-  useEffect(() => {
-    const fetch = async () => {
-      if (!role || role !== 'ENSEIGNANT') {
-        setError("Accès refusé : cette page est réservée aux enseignants.");
-        setLoading(false);
-        return;
+  // Charger les données
+  const fetchData = useCallback(async () => {
+    if (!role || role !== 'ENSEIGNANT') {
+      setError("Accès refusé : cette page est réservée aux enseignants.");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const params = {};
+      if (selectedPromotionId) params.promotion_id = selectedPromotionId;
+      if (selectedMatiereId) params.matiere_id = selectedMatiereId;
+      
+      const resp = await api.get('teacher/courses/', { params });
+      const fetched = resp.data.cours || [];
+      const filters = resp.data.filters || {};
+      
+      setCourses(fetched);
+      setPromotions(filters.promotions || []);
+      setMatieres(filters.matieres || []);
+      
+      if (fetched.length > 0 && !selectedCourseId) {
+        setSelectedCourseId(fetched[0].id);
       }
-
-      try {
-        const params = {};
-        if (selectedPromotionId) params.promotion_id = selectedPromotionId;
-        if (selectedMatiereId) params.matiere_id = selectedMatiereId;
-        const resp = await api.get('teacher/courses/', { params });
-        const fetched = resp.data.cours || [];
-        const filters = resp.data.filters || {};
-        if (filters.promotions) setPromotions(filters.promotions || []);
-        if (filters.matieres) setMatieres(filters.matieres || []);
-        setCourses(fetched);
-        if (fetched.length) setSelectedCourseId(fetched[0].id);
-        // init editable grades
-        const eg = {};
-        fetched.forEach(c => {
-          (c.examens || []).forEach(ex => {
-            eg[ex.id] = {};
-            (c.students || []).forEach(s => {
-              const noteEntry = s.examens && s.examens.find(se => String(se.id) === String(ex.id));
-              eg[ex.id][s.id] = noteEntry && noteEntry.note != null ? noteEntry.note : '';
-            });
+      
+      // Initialiser les grades state
+      const grades = {};
+      fetched.forEach(c => {
+        (c.examens || []).forEach(ex => {
+          grades[ex.id] = {};
+          (c.students || []).forEach(s => {
+            const noteEntry = s.examens && s.examens.find(se => String(se.id) === String(ex.id));
+            grades[ex.id][s.id] = noteEntry && noteEntry.note != null ? noteEntry.note : '';
           });
         });
-        setGradesState(eg);
-      } catch (err) {
-        console.error('Erreur teacher courses', err);
-        setError('Impossible de charger les cours assignés.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetch();
-  }, [role]);
-
-  // Refetch when filters change
-  useEffect(() => {
-    if (!role || role !== 'ENSEIGNANT') return;
-    const fetchWithFilters = async () => {
-      setLoading(true);
-      try {
-        const params = {};
-        if (selectedPromotionId) params.promotion_id = selectedPromotionId;
-        if (selectedMatiereId) params.matiere_id = selectedMatiereId;
-        const resp = await api.get('teacher/courses/', { params });
-        const fetched = resp.data.cours || [];
-        const filters = resp.data.filters || {};
-        if (filters.promotions) setPromotions(filters.promotions || []);
-        if (filters.matieres) setMatieres(filters.matieres || []);
-        setCourses(fetched);
-      } catch (err) {
-        console.error('Erreur teacher courses with filters', err);
-        setError('Impossible de charger les cours assignés.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchWithFilters();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedPromotionId, selectedMatiereId]);
-
-  // derived values and hooks that must run before any early returns
-  const filtered = courses.filter(c =>
-    c.nom?.toLowerCase().includes(search.toLowerCase()) ||
-    c.code?.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const selectedCourse = useMemo(() => courses.find(c => String(c.id) === String(selectedCourseId)) || filtered[0] || null, [courses, selectedCourseId, filtered]);
-  const exams = selectedCourse?.examens || [];
-  const students = selectedCourse?.students || [];
+      });
+      setGradesState(grades);
+    } catch (err) {
+      console.error('Erreur teacher courses', err);
+      setError('Impossible de charger les cours assignés.');
+    } finally {
+      setLoading(false);
+    }
+  }, [role, selectedPromotionId, selectedMatiereId]);
 
   useEffect(() => {
-    if (selectedCourse && exams.length > 0) setSelectedExamId(exams[0].id);
-    else setSelectedExamId(null);
-    setPage(1);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCourseId, selectedCourse?.id]);
+    fetchData();
+  }, [fetchData]);
 
-  useEffect(() => {
-    if (!selectedExamId) return;
-    setGradesState(prev => {
-      const next = { ...prev };
-      if (!next[selectedExamId]) {
-        next[selectedExamId] = {};
-        (students || []).forEach(s => {
-          const noteEntry = s.examens && s.examens.find(se => String(se.id) === String(selectedExamId));
-          next[selectedExamId][s.id] = noteEntry && noteEntry.note != null ? noteEntry.note : '';
-        });
+  // Filtrer et trier les cours
+  const filteredAndSortedCourses = useMemo(() => {
+    let result = [...courses];
+    
+    // Filtre recherche
+    if (searchTerm) {
+      result = result.filter(c => 
+        c.nom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.code?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    // Tri
+    result.sort((a, b) => {
+      let A, B;
+      if (sortBy === 'nom') {
+        A = (a.nom || '').toLowerCase();
+        B = (b.nom || '').toLowerCase();
+      } else if (sortBy === 'code') {
+        A = (a.code || '').toLowerCase();
+        B = (b.code || '').toLowerCase();
+      } else if (sortBy === 'students') {
+        A = a.students?.length || 0;
+        B = b.students?.length || 0;
+      } else if (sortBy === 'exams') {
+        A = a.examens?.length || 0;
+        B = b.examens?.length || 0;
       }
-      return next;
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedExamId, selectedCourseId]);
-
-  const sortedStudents = useMemo(() => {
-    const list = (students || []).slice();
-    list.sort((a,b) => {
-      let A = a[sortBy] || '';
-      let B = b[sortBy] || '';
-      if (sortBy === 'nom') { A = (a.nom||'').toLowerCase(); B = (b.nom||'').toLowerCase(); }
-      if (sortBy === 'matricule') { A = (a.matricule||'').toLowerCase(); B = (b.matricule||'').toLowerCase(); }
-      if (sortBy === 'note') {
-        const an = gradesState[selectedExamId]?.[a.id]?.note ?? gradesState[selectedExamId]?.[a.id];
-        const bn = gradesState[selectedExamId]?.[b.id]?.note ?? gradesState[selectedExamId]?.[b.id];
-        A = an === '' || an === null || an === undefined ? -Infinity : parseFloat(an);
-        B = bn === '' || bn === null || bn === undefined ? -Infinity : parseFloat(bn);
-      }
+      
       if (A < B) return sortDir === 'asc' ? -1 : 1;
       if (A > B) return sortDir === 'asc' ? 1 : -1;
       return 0;
     });
-    return list;
-  }, [students, sortBy, sortDir, gradesState, selectedExamId]);
-  const pageCount = Math.max(1, Math.ceil((sortedStudents.length || 0) / pageSize));
-  const pagedStudents = sortedStudents.slice((page-1)*pageSize, page*pageSize);
+    
+    return result;
+  }, [courses, searchTerm, sortBy, sortDir]);
 
-  if (loading) return (
-    <div className="loading-container">
-      <div className="loading-spinner"></div>
-      <p>Chargement des cours...</p>
-    </div>
+  // Pagination des cours
+  const totalPages = Math.ceil(filteredAndSortedCourses.length / pageSize);
+  const paginatedCourses = filteredAndSortedCourses.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
 
-  if (error) return (
-    <div className="error-container">
-      <div className="error-message">
-        <h2>⚠️ Erreur</h2>
-        <p>{error}</p>
-      </div>
-    </div>
-  );
+  // Sélection du cours actuel
+  const selectedCourse = useMemo(() => {
+    if (selectedCourseId) {
+      return courses.find(c => String(c.id) === String(selectedCourseId)) || null;
+    }
+    return filteredAndSortedCourses[0] || null;
+  }, [courses, selectedCourseId, filteredAndSortedCourses]);
 
+  useEffect(() => {
+    if (selectedCourse) {
+      setSelectedExamId(selectedCourse.examens?.[0]?.id || '');
+    }
+  }, [selectedCourse]);
 
+  const exams = selectedCourse?.examens || [];
+  const students = selectedCourse?.students || [];
+
+  // Gestion des notes
   const updateGrade = (studentId, value) => {
+    if (!selectedExamId) return;
     setGradesState(prev => ({
       ...prev,
       [selectedExamId]: {
@@ -177,206 +170,379 @@ const TeacherCourses = () => {
 
   const saveGrades = async () => {
     if (!selectedExamId) return;
-    const payload = [];
-    const examGrades = gradesState[selectedExamId] || {};
-    for (const studentId of Object.keys(examGrades)) {
-      const rec = examGrades[studentId];
-      payload.push({ etudiant_id: studentId, valeur: rec === '' ? null : rec });
-    }
-
+    
+    setSavingGrades(true);
+    setError('');
+    setSuccessMessage('');
+    
     try {
+      const payload = [];
+      const examGrades = gradesState[selectedExamId] || {};
+      
+      for (const studentId of Object.keys(examGrades)) {
+        const rec = examGrades[studentId];
+        payload.push({ 
+          etudiant_id: studentId, 
+          valeur: rec === '' ? null : rec 
+        });
+      }
+      
       await api.post(`teacher/exams/${selectedExamId}/bulk-save/`, { grades: payload });
-      // refresh courses to show updated notes
-      const params = {};
-      if (selectedPromotionId) params.promotion_id = selectedPromotionId;
-      if (selectedMatiereId) params.matiere_id = selectedMatiereId;
-      const resp = await api.get('teacher/courses/', { params });
-      const fetched = resp.data.cours || [];
-      setCourses(fetched);
-      alert('Notes sauvegardées');
+      
+      // Recharger les données
+      await fetchData();
+      setSuccessMessage('Notes sauvegardées avec succès');
+      setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
       console.error('Erreur save grades', err);
-      alert('Erreur lors de la sauvegarde');
+      const msg = err.response?.data?.detail || 'Erreur lors de la sauvegarde';
+      setError(msg);
+    } finally {
+      setSavingGrades(false);
     }
   };
 
+  // Export functions
   const exportCSV = () => {
-    if (!selectedCourse) return;
-    if (!selectedExamId) return;
-    const rows = [['Nom','Matricule','Note']];
+    if (!selectedCourse || !selectedExamId) return;
+    const rows = [['Nom', 'Matricule', 'Note']];
     const examGrades = gradesState[selectedExamId] || {};
-    for (const s of sortedStudents) {
-      const g = examGrades[s.id];
-      rows.push([s.nom, s.matricule, g ?? '']);
-    }
-    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    
+    const sortedStudents = [...students].sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+    sortedStudents.forEach(s => {
+      rows.push([s.nom, s.matricule, examGrades[s.id] ?? '']);
+    });
+    
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `${selectedCourse?.code || 'course'}_exam_${selectedExamId}.csv`; a.click(); URL.revokeObjectURL(url);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedCourse.code || 'cours'}_examen_${selectedExamId}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const exportPDF = () => {
     if (!selectedCourse || !selectedExamId) return;
-    const examGrades = gradesState[selectedExamId] || {};
+    
     const doc = new jsPDF();
-    const title = `${selectedCourse.nom} - Examen ${selectedExamId}`;
-    doc.setFontSize(14);
-    doc.text(title, 14, 20);
-    const rows = sortedStudents.map(s => [s.nom, s.matricule, examGrades[s.id] ?? '']);
-    // AutoTable columns
-    // eslint-disable-next-line no-undef
+    doc.setFontSize(16);
+    doc.text(`${selectedCourse.nom} - Notes d'examen`, 14, 20);
+    doc.setFontSize(11);
+    doc.text(`Date: ${new Date().toLocaleDateString('fr-FR')}`, 14, 30);
+    
+    const examGrades = gradesState[selectedExamId] || {};
+    const rows = students.map(s => [
+      s.nom,
+      s.matricule,
+      examGrades[s.id] ?? 'Non noté'
+    ]);
+    
+    // @ts-ignore - jspdf-autotable
     doc.autoTable({
       head: [['Nom', 'Matricule', 'Note']],
       body: rows,
-      startY: 28,
+      startY: 40,
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246] }
     });
-    doc.save(`${selectedCourse.code || 'course'}_exam_${selectedExamId}.pdf`);
+    
+    doc.save(`${selectedCourse.code}_notes_${selectedExamId}.pdf`);
   };
 
-  const exportICS = () => {
-    if (!selectedCourse) return;
-    let ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//EduManager//EN\n';
-    (selectedCourse.examens||[]).forEach((e) => {
-      const uid = `${e.id}@edumanager.local`;
-      const dt = (e.date || e.date_examen || '').replace(/-/g,'');
-      ics += `BEGIN:VEVENT\nUID:${uid}\nSUMMARY:${selectedCourse.nom} - ${e.nom}\nDTSTAMP:${dt}T080000\nDTSTART:${dt}T080000\nDTEND:${dt}T100000\nEND:VEVENT\n`;
-    });
-    ics += 'END:VCALENDAR';
-    const blob = new Blob([ics], { type: 'text/calendar' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `${selectedCourse.code || 'course'}_exams.ics`; a.click(); URL.revokeObjectURL(url);
-  };
+  if (loading && courses.length === 0) {
+    return (
+      <div className="loading-container">
+        <div className="loading-spinner"></div>
+        <p>Chargement des cours...</p>
+      </div>
+    );
+  }
+
+  if (error && courses.length === 0) {
+    return (
+      <div className="error-container">
+        <div className="error-message">
+          <AlertCircle size={48} />
+          <h3>Erreur de chargement</h3>
+          <p>{error}</p>
+          <button className="btn-retry" onClick={fetchData}>Réessayer</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="student-courses-page">
+    <div className="teacher-courses-page">
+      {/* Header */}
       <div className="page-header">
         <div className="header-content">
           <h1><BookOpen size={28} /> Mes Cours</h1>
-          <p>Liste des cours que vous enseignez et notes des étudiants.</p>
+          <p>Gérez vos cours, examens et saisissez les notes des étudiants.</p>
         </div>
       </div>
 
-      <div className="management-header" style={{ gap: '1rem', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <div className="search-bar">
-            <Search size={18} />
-            <input placeholder="Rechercher un cours..." value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-          <select value={selectedPromotionId || ''} onChange={(e) => setSelectedPromotionId(e.target.value)}>
-            <option value="">Toutes promotions</option>
-            {promotions.map(p => (
-              <option key={p.id} value={p.id}>{p.nom}</option>
-            ))}
-          </select>
-          <select value={selectedMatiereId || ''} onChange={(e) => setSelectedMatiereId(e.target.value)}>
-            <option value="">Toutes matières</option>
-            {matieres.map(m => (
-              <option key={m.id} value={m.id}>{m.nom}</option>
-            ))}
-          </select>
-          <select value={selectedCourseId || ''} onChange={(e) => setSelectedCourseId(e.target.value)}>
-            {filtered.map(c => (
-              <option key={c.id} value={c.id}>{c.nom} — {c.code}</option>
-            ))}
-          </select>
+      {/* Messages */}
+      {successMessage && (
+        <div className="alert alert-success">
+          <CheckCircle size={18} />
+          {successMessage}
         </div>
-
-        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          <button className="action-outline" onClick={exportCSV}><Download size={14} /> CSV</button>
-          <button className="action-outline" onClick={exportPDF}><Download size={14} /> PDF</button>
-          <button className="action-outline" onClick={exportICS}><Download size={14} /> ICS</button>
-          <button className="action-primary" onClick={() => window.print()}><Printer size={14} /> Imprimer</button>
+      )}
+      {error && (
+        <div className="alert alert-error">
+          <AlertCircle size={18} />
+          {error}
         </div>
-      </div>
-
-      {!selectedCourse && (
-        <div className="no-courses">Aucun cours sélectionné</div>
       )}
 
-      {selectedCourse && (
-        <div style={{ marginTop: '1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-              <h2 style={{ margin: 0 }}>{selectedCourse.nom} <span style={{ color: '#6b7280', fontSize: '0.9rem' }}>({selectedCourse.code})</span></h2>
-              <div className="stat-item"><Users size={16} /> <span>{selectedCourse.students?.length || 0} étudiants</span></div>
-              <div className="stat-item"><FileText size={16} /> <span>{selectedCourse.examens?.length || 0} examens</span></div>
+      {/* Filtres et recherche */}
+      <div className="management-header">
+        <div className="filters-group">
+          <div className="search-bar">
+            <Search size={18} />
+            <input
+              type="text"
+              placeholder="Rechercher un cours..."
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+            />
+          </div>
+          
+          <select 
+            value={selectedPromotionId} 
+            onChange={(e) => { setSelectedPromotionId(e.target.value); setCurrentPage(1); }}
+          >
+            <option value="">Toutes promotions</option>
+            {promotions.map(p => (
+              <option key={p.id} value={p.id}>{p.nom} ({p.annee})</option>
+            ))}
+          </select>
+          
+          <select 
+            value={selectedMatiereId} 
+            onChange={(e) => { setSelectedMatiereId(e.target.value); setCurrentPage(1); }}
+          >
+            <option value="">Toutes matières</option>
+            {matieres.map(m => (
+              <option key={m.id} value={m.id}>{m.nom} ({m.code})</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="actions-group">
+          <select 
+            value={pageSize} 
+            onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+            className="page-size-select"
+          >
+            <option value={5}>5 par page</option>
+            <option value={10}>10 par page</option>
+            <option value={25}>25 par page</option>
+            <option value={50}>50 par page</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Liste des cours (paginée) */}
+      <div className="courses-section">
+        <h2>Vos Cours ({filteredAndSortedCourses.length})</h2>
+        
+        {filteredAndSortedCourses.length === 0 ? (
+          <div className="empty-state">
+            <BookOpen size={48} />
+            <p>Aucun cours trouvé</p>
+          </div>
+        ) : (
+          <>
+            <div className="courses-grid">
+              {paginatedCourses.map(course => (
+                <div 
+                  key={course.id}
+                  className={`course-card ${selectedCourseId === course.id ? 'active' : ''}`}
+                  onClick={() => setSelectedCourseId(course.id)}
+                >
+                  <div className="course-card-header">
+                    <div className="course-icon">
+                      <BookOpen size={24} />
+                    </div>
+                    <div className="course-code">{course.code}</div>
+                  </div>
+                  <h3 className="course-title">{course.nom}</h3>
+                  <div className="course-meta">
+                    <span><Users size={14} /> {course.students?.length || 0} étudiants</span>
+                    <span><FileText size={14} /> {course.examens?.length || 0} examens</span>
+                  </div>
+                  <div className="course-promotions">
+                    {(course.promotions || []).slice(0, 2).map(p => (
+                      <span key={p.id} className="promo-tag">{p.nom}</span>
+                    ))}
+                    {(course.promotions || []).length > 2 && (
+                      <span className="promo-more">+{course.promotions.length - 2}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
 
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <select value={selectedExamId || ''} onChange={(e) => setSelectedExamId(e.target.value)}>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="pagination">
+                <button 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft size={16} /> Précédent
+                </button>
+                <div className="page-info">
+                  Page {currentPage} / {totalPages}
+                  <span className="total-items">({filteredAndSortedCourses.length} cours)</span>
+                </div>
+                <button 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Suivant <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Détails du cours sélectionné */}
+      {selectedCourse && (
+        <div className="course-details-section">
+          <div className="details-header">
+            <h2>
+              <BookOpen size={24} />
+              {selectedCourse.nom}
+              <span className="course-code-badge">{selectedCourse.code}</span>
+            </h2>
+            
+            <div className="details-actions">
+              <select 
+                value={selectedExamId || ''} 
+                onChange={(e) => setSelectedExamId(e.target.value)}
+                className="exam-select"
+              >
                 <option value="">Sélectionner un examen...</option>
-                {selectedCourse.examens?.map(ex => (
-                  <option key={ex.id} value={ex.id}>{ex.nom} — {ex.date}</option>
+                {exams.map(ex => (
+                  <option key={ex.id} value={ex.id}>
+                    {ex.nom} — {ex.date_examen || ex.date || 'Date non définie'}
+                  </option>
                 ))}
               </select>
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-                <option value="nom">Trier: Nom</option>
-                <option value="matricule">Trier: Matricule</option>
-                <option value="note">Trier: Note</option>
-              </select>
-              <select value={sortDir} onChange={(e) => setSortDir(e.target.value)}>
-                <option value="asc">Asc</option>
-                <option value="desc">Desc</option>
-              </select>
+
+              <div className="sort-controls">
+                <label>Trier:</label>
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+                  <option value="nom">Nom</option>
+                  <option value="matricule">Matricule</option>
+                  <option value="note">Note</option>
+                </select>
+                <select value={sortDir} onChange={(e) => setSortDir(e.target.value)}>
+                  <option value="asc">Ascendant</option>
+                  <option value="desc">Descendant</option>
+                </select>
+              </div>
+
+              <div className="export-buttons">
+                <button className="btn-outline" onClick={exportCSV} disabled={!selectedExamId}>
+                  <Download size={16} /> CSV
+                </button>
+                <button className="btn-outline" onClick={exportPDF} disabled={!selectedExamId}>
+                  <Download size={16} /> PDF
+                </button>
+                <button className="btn-outline" onClick={() => window.print()}>
+                  <Printer size={16} /> Imprimer
+                </button>
+              </div>
             </div>
           </div>
 
+          {/* Liste des étudiants avec notes */}
           {selectedExamId ? (
-            <div style={{ marginTop: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <label>Page size: </label>
-                  <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}>
-                    <option value={5}>5</option>
-                    <option value={10}>10</option>
-                    <option value={25}>25</option>
-                  </select>
+            <div className="grades-container">
+              <div className="grades-header">
+                <div className="stats">
+                  <span><Users size={16} /> {students.length} étudiants</span>
+                  <span><FileText size={16} /> Examen: {exams.find(e => e.id === selectedExamId)?.nom}</span>
                 </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button className="action-outline" onClick={() => { setPage((p) => Math.max(1,p-1)) }}><ChevronLeft size={16} /></button>
-                  <div style={{ alignSelf: 'center' }}>Page {page} / {pageCount}</div>
-                  <button className="action-outline" onClick={() => { setPage((p) => Math.min(pageCount,p+1)) }}><ChevronRight size={16} /></button>
-                </div>
+                <button 
+                  className="btn-primary" 
+                  onClick={saveGrades} 
+                  disabled={savingGrades}
+                >
+                  <Save size={16} />
+                  {savingGrades ? 'Sauvegarde...' : 'Sauvegarder les notes'}
+                </button>
               </div>
 
-              <div style={{ marginTop: '1rem' }}>
-                <table className="data-table">
+              <div className="grades-table-wrapper">
+                <table className="grades-table">
                   <thead>
                     <tr>
-                      <th>Étudiant</th>
+                      <th>#</th>
+                      <th>Nom complet</th>
                       <th>Matricule</th>
-                      <th>Note</th>
+                      <th>Note (0-20)</th>
+                      <th>Statut</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {pagedStudents.map(s => (
-                      <tr key={s.id}>
-                        <td>{s.nom}</td>
-                        <td>{s.matricule}</td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            max="20"
-                            step="0.01"
-                            value={(gradesState[selectedExamId] && gradesState[selectedExamId][s.id]) ?? ''}
-                            onChange={(e) => updateGrade(s.id, e.target.value === '' ? '' : Number(e.target.value))}
-                            style={{ width: '80px', padding: '6px', borderRadius: '6px', border: '1px solid #e5e7eb' }}
-                          />
-                        </td>
-                      </tr>
-                    ))}
+                    {students.map((student, idx) => {
+                      const grade = gradesState[selectedExamId]?.[student.id] ?? '';
+                      const isValid = grade === '' || (grade >= 0 && grade <= 20);
+                      
+                      return (
+                        <tr key={student.id}>
+                          <td className="rank-cell">{idx + 1}</td>
+                          <td className="name-cell">
+                            <div className="student-avatar">
+                              {(student.nom || '?').charAt(0).toUpperCase()}
+                            </div>
+                            {student.nom}
+                          </td>
+                          <td className="matricule-cell">{student.matricule}</td>
+                          <td className="grade-cell">
+                            <input
+                              type="number"
+                              min="0"
+                              max="20"
+                              step="0.01"
+                              value={grade}
+                              onChange={(e) => updateGrade(student.id, 
+                                e.target.value === '' ? '' : Number(e.target.value)
+                              )}
+                              className={`grade-input ${!isValid && grade !== '' ? 'invalid' : ''}`}
+                              placeholder="..."
+                            />
+                          </td>
+                          <td className="status-cell">
+                            {grade === '' ? (
+                              <span className="status-badge empty">Non noté</span>
+                            ) : !isValid ? (
+                              <span className="status-badge invalid">Invalide</span>
+                            ) : (
+                              <span className={`status-badge ${grade >= 10 ? 'pass' : 'fail'}`}>
+                                {grade >= 10 ? 'Admissible' : 'Échec'}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
-
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                <button className="action-primary" onClick={saveGrades}><Save size={14} /> Sauvegarder</button>
-                <button className="action-outline" onClick={exportCSV}><Download size={14} /> Export CSV</button>
-              </div>
             </div>
           ) : (
-            <div style={{ marginTop: '1rem' }} className="no-courses">Sélectionnez un examen pour modifier les notes.</div>
+            <div className="no-exam-selected">
+              <FileText size={48} />
+              <p>Sélectionnez un examen pour saisir les notes</p>
+            </div>
           )}
         </div>
       )}

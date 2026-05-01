@@ -255,6 +255,40 @@
   border: 1px solid #fecaca;
 }
 
+/* Category Legend */
+.category-legend {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 10px 16px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  flex-wrap: wrap;
+}
+
+.legend-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  margin-right: 4px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #374151;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
 /* Week Table Container */
 .week-table-container {
   background: white;
@@ -315,6 +349,11 @@
   vertical-align: top;
 }
 
+.day-header-col.today {
+  background: #dbeafe;
+  border-bottom: 2px solid #3b82f6;
+}
+
 .day-header-col:last-child {
   border-right: none;
 }
@@ -353,7 +392,7 @@
   padding: 0;
   vertical-align: top;
   background: #fefefe;
-  min-height: 80px;
+  min-height: 100px;
 }
 
 .time-slot-cell:last-child {
@@ -482,7 +521,7 @@
 
 .empty-slot {
   height: 100%;
-  min-height: 80px;
+  min-height: 100px;
 }
 
 /* Day Detail Section */
@@ -858,6 +897,12 @@
   cursor: not-allowed;
 }
 
+.form-error {
+  color: #dc2626;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
 .modal-footer {
   display: flex;
   justify-content: flex-end;
@@ -1044,4 +1089,81 @@
     font-size: 12px;
     padding: 6px 10px;
   }
+}
+
+/* Available Slots Suggestions */
+.available-slots-section {
+  margin: 16px 0;
+  padding: 12px;
+  background: #f0f9ff;
+  border-radius: 10px;
+  border: 1px solid #dbeafe;
+}
+
+.available-slots-section label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #1e40af;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.slots-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.slot-suggestion {
+  position: relative;
+  padding: 6px 12px;
+  border: 1px solid #93c5fd;
+  border-radius: 6px;
+  background: white;
+  color: #1e40af;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.slot-suggestion:hover:not(.disabled) {
+  background: #dbeafe;
+  border-color: #3b82f6;
+}
+
+.slot-suggestion.selected {
+  background: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.slot-suggestion.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: #f3f4f6;
+  color: #9ca3af;
+  border-color: #e5e7eb;
+}
+
+.slot-suggestion.manual {
+  border-style: dashed;
+  color: #6b7280;
+  background: #f9fafb;
+}
+
+.slot-suggestion.manual:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+  color: #374151;
+}
+
+.unavailable-badge {
+  display: block;
+  font-size: 9px;
+  background: #fecaca;
+  color: #dc2626;
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin-top: 2px;
+  text-align: center;
 }

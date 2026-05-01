@@ -10,12 +10,12 @@ import StudentDashboard from '../components/dashboard/StudentDashboard';
 import UsersManagement from './admin/UsersManagement';
 import CoursesManagement from './admin/CoursesManagement';
 import ClassesManagement from './admin/ClassesManagement';
+import SallesManagement from './admin/SallesManagement';
 import SettingsPage from './admin/SettingsPage';
 import AdminScheduler from './admin/AdminScheduler';
 import TeacherCourses from './teacher/TeacherCourses';
 import TeacherStudents from './teacher/TeacherStudents';
-import TeacherStudentDetail from './teacher/TeacherStudentDetail';
-import StudentGrades from './student/StudentGrades';
+import StudentCourses from './student/StudentCourses';
 import StudentSchedule from './student/StudentSchedule';
 import './Dashboard.css';
 
@@ -36,6 +36,7 @@ const Dashboard = () => {
     return <CoursesManagement />;
   };
   const ClassesPage = () => <ClassesManagement />;
+  const SallesPage = () => <SallesManagement />;
   const SettingsPageComponent = () => <SettingsPage />;
   const SchedulerPage = () => <AdminScheduler />;
 
@@ -44,7 +45,8 @@ const Dashboard = () => {
 
   const GradesPage = () => {
     if (role === 'ENSEIGNANT') return <TeacherCourses />;
-    return <StudentGrades />;
+    // Pour les étudiants, on redirige vers Mes Cours qui contient les notes
+    return <StudentCourses />;
   };
 
   const SchedulePage = () => <StudentSchedule />;
@@ -147,18 +149,18 @@ const Dashboard = () => {
     };
   }, [role, logout, navigate]);
 
-  const routes = useRoutes([
-    { path: '/', element: renderDashboard() },
-    { path: 'users', element: <UsersPage /> },
-    { path: 'courses', element: <CoursesPage /> },
-    { path: 'classes', element: <ClassesPage /> },
-    { path: 'settings', element: <SettingsPageComponent /> },
-    { path: 'students', element: role === 'ENSEIGNANT' ? <TeacherStudentsPage /> : <StudentsPage /> },
-    { path: 'students/:id', element: role === 'ENSEIGNANT' ? <TeacherStudentDetail /> : <StudentsPage /> },
-    { path: 'grades', element: <GradesPage /> },
-    { path: 'schedule', element: <SchedulePage /> },
-    { path: 'scheduler', element: role === 'ADMIN' ? <SchedulerPage /> : <SchedulePage /> },
-  ]);
+   const routes = useRoutes([
+     { path: '/', element: renderDashboard() },
+     { path: 'users', element: <UsersPage /> },
+     { path: 'courses', element: <CoursesPage /> },
+     { path: 'classes', element: <ClassesPage /> },
+     { path: 'salles', element: <SallesPage /> },
+     { path: 'settings', element: <SettingsPageComponent /> },
+     { path: 'students', element: role === 'ENSEIGNANT' ? <TeacherStudentsPage /> : <StudentsPage /> },
+     { path: 'grades', element: <GradesPage /> },
+     { path: 'schedule', element: <SchedulePage /> },
+     { path: 'scheduler', element: role === 'ADMIN' ? <SchedulerPage /> : <SchedulePage /> },
+   ]);
 
   const getTitle = () => {
     const path = location.pathname.replace('/dashboard', '');
@@ -180,17 +182,19 @@ const Dashboard = () => {
         return 'Gestion des Cours';
       case '/classes':
         return 'Gestion des Classes';
+      case '/salles':
+        return 'Gestion des Salles';
       case '/settings':
         return 'Paramètres';
       case '/students':
         return 'Gestion des Étudiants';
       case '/grades':
         return 'Gestion des Notes';
-       case '/schedule':
-         return 'Emploi du temps';
-       case '/scheduler':
-         return 'Planning des Cours';
-       default:
+      case '/schedule':
+        return 'Emploi du temps';
+      case '/scheduler':
+        return 'Planning des Cours';
+      default:
         return 'Tableau de bord';
     }
   };
