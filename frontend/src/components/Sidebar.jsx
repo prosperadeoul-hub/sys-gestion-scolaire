@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Home, Users, BookOpen, Layers, Settings, ClipboardList, Calendar, LogOut, X, LayoutTemplate, MapPin } from 'lucide-react';
+import { Home, Users, BookOpen, Layers, Settings, ClipboardList, Calendar, LogOut, X, LayoutTemplate, MapPin, FileText } from 'lucide-react';
 import './Sidebar.css';
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -38,6 +38,7 @@ const Sidebar = ({ isOpen, onClose }) => {
         return [
           { id: 'dashboard', label: 'Tableau de bord', icon: <Home size={18} />, path: '/' },
           { id: 'courses', label: 'Mes Cours', icon: <BookOpen size={18} />, path: 'courses' },
+          { id: 'bulletin', label: 'Bulletin', icon: <FileText size={18} />, path: 'grades' },
           { id: 'schedule', label: 'Emploi du temps', icon: <Calendar size={18} />, path: 'schedule' },
         ];
       default:

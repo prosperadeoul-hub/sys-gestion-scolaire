@@ -1,0 +1,619 @@
+/* ====================
+   STUDENT BULLETIN PAGE
+   ==================== */
+
+.bulletin-page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px;
+  background: #f8fafc;
+  min-height: 100vh;
+}
+
+/* Actions (print button) */
+.bulletin-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-left: 10px;
+}
+
+.print-btn {
+  background: #3b82f6;
+  color: white;
+}
+
+.print-btn:hover {
+  background: #2563eb;
+  transform: translateY(-2px);
+}
+
+.download-btn {
+  background: #10b981;
+  color: white;
+}
+
+.download-btn:hover {
+  background: #059669;
+  transform: translateY(-2px);
+}
+
+/* Header */
+.bulletin-header {
+  background: #1e3a8a;
+  border-radius: 20px;
+  padding: 32px;
+  color: white;
+  margin-bottom: 24px;
+  box-shadow: 0 10px 40px rgba(30, 58, 138, 0.3);
+}
+
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.school-info h2 {
+  font-size: 24px;
+  font-weight: 800;
+  margin: 0 0 4px 0;
+  letter-spacing: 1px;
+}
+
+.school-info p {
+  font-size: 13px;
+  opacity: 0.9;
+  margin: 0;
+}
+
+.bulletin-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.bulletin-title h1 {
+  font-size: 28px;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.header-divider {
+  height: 2px;
+  background: rgba(255, 255, 255, 0.2);
+  margin-bottom: 24px;
+}
+
+/* Student Info Section */
+.student-info-section {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+  backdrop-filter: blur(10px);
+}
+
+.info-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+}
+
+.info-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.info-group label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  opacity: 0.8;
+}
+
+.info-value {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.info-value.badge {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+/* Summary Section */
+.summary-section {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 20px;
+  margin-bottom: 32px;
+}
+
+.summary-card {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+}
+
+.summary-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.summary-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.summary-icon.rank {
+  background: #8b5cf6;
+}
+
+.summary-icon.subjects {
+  background: #3b82f6;
+}
+
+.summary-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-label {
+  font-size: 13px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.summary-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: #111827;
+}
+
+/* Details Section */
+.details-section {
+  background: white;
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  margin-bottom: 32px;
+}
+
+.details-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 24px 0;
+}
+
+.details-section h3 svg {
+  color: #3b82f6;
+}
+
+/* Subjects Grid */
+.subjects-bulletin {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.subject-card {
+  border: 2px solid #e5e7eb;
+  border-radius: 16px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.subject-card:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
+}
+
+.subject-header {
+  background: #f9fafb;
+  padding: 20px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.subject-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.subject-title svg {
+  color: #3b82f6;
+}
+
+.subject-code {
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  background: #e5e7eb;
+  padding: 2px 10px;
+  border-radius: 6px;
+}
+
+.subject-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.professor, .coefficient {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Grades within subject */
+.subject-grades {
+  padding: 20px 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.exam-grade-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  background: #f9fafb;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  transition: all 0.2s;
+}
+
+.exam-grade-card:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.exam-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.exam-date {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.grade-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  width: fit-content;
+}
+
+.grade-status {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.no-exams {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: #6b7280;
+  padding: 20px;
+  font-size: 14px;
+}
+
+/* Subject Footer - Moyenne */
+.subject-footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 24px;
+  background: #f9fafb;
+  border-top: 2px solid #e5e7eb;
+}
+
+.moyenne-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.moyenne-value {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  font-size: 24px;
+  font-weight: 800;
+  border: 2px solid;
+  border-radius: 8px;
+  padding: 2px 8px;
+}
+
+.moyenne-value .value {
+  line-height: 1.2;
+}
+
+.moyenne-value .max {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.moyenne-status {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Bulletin Footer */
+.bulletin-footer {
+  background: white;
+  border-radius: 16px;
+  padding: 32px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  text-align: center;
+}
+
+.signature-section {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 40px;
+}
+
+.signature-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-width: 200px;
+}
+
+.signature-line {
+  width: 250px;
+  height: 1px;
+  background: #9ca3af;
+  margin-bottom: 4px;
+}
+
+.signature-box span {
+  font-size: 12px;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.generation-date {
+  font-size: 13px;
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* Loading & Error States */
+.loading-container, .error-container, .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  background: white;
+  border-radius: 20px;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #e5e7eb;
+  border-top: 4px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-message, .empty-state {
+  color: #6b7280;
+}
+
+.error-message h3, .empty-state h3 {
+  margin: 16px 0 8px 0;
+  font-size: 20px;
+  color: #dc2626;
+}
+
+/* Print Styles */
+@media print {
+  .bulletin-actions,
+  .bulletin-page .sidebar,
+  .bulletin-page .topbar,
+  .bulletin-page .no-print {
+    display: none !important;
+  }
+
+  .bulletin-page {
+    padding: 0;
+    background: white;
+    max-width: 100%;
+  }
+
+  .bulletin-header {
+    background: #1e3a8a !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color: white !important;
+  }
+
+  .school-info h2,
+  .bulletin-title h1,
+  .info-value,
+  .summary-value {
+    color: white !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .details-section,
+  .bulletin-footer {
+    box-shadow: none;
+    border: 1px solid #e5e7eb;
+  }
+
+  .subject-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .bulletin-page {
+    padding: 16px;
+  }
+
+  .bulletin-header {
+    padding: 20px;
+  }
+
+  .header-top {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .bulletin-title h1 {
+    font-size: 20px;
+  }
+
+  .info-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .summary-section {
+    grid-template-columns: 1fr;
+  }
+
+  .details-section {
+    padding: 20px;
+  }
+
+  .subject-grades {
+    grid-template-columns: 1fr;
+  }
+
+  .subject-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .signature-section {
+    flex-direction: column;
+    gap: 30px;
+  }
+
+  .signature-line {
+    width: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .bulletin-header {
+    padding: 16px;
+  }
+
+  .school-info h2 {
+    font-size: 18px;
+  }
+
+  .bulletin-title h1 {
+    font-size: 16px;
+    letter-spacing: 1px;
+  }
+
+  .info-group {
+    gap: 4px;
+  }
+
+  .info-value {
+    font-size: 14px;
+  }
+
+  .subject-header {
+    padding: 16px;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .subject-title {
+    font-size: 16px;
+  }
+
+  .subject-meta {
+    gap: 12px;
+  }
+}

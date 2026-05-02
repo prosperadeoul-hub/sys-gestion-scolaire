@@ -17,6 +17,7 @@ import TeacherCourses from './teacher/TeacherCourses';
 import TeacherStudents from './teacher/TeacherStudents';
 import StudentCourses from './student/StudentCourses';
 import StudentSchedule from './student/StudentSchedule';
+import StudentBulletin from './student/StudentBulletin';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -45,8 +46,8 @@ const Dashboard = () => {
 
   const GradesPage = () => {
     if (role === 'ENSEIGNANT') return <TeacherCourses />;
-    // Pour les étudiants, on redirige vers Mes Cours qui contient les notes
-    return <StudentCourses />;
+    // Pour les étudiants, afficher le bulletin
+    return <StudentBulletin />;
   };
 
   const SchedulePage = () => <StudentSchedule />;
@@ -189,7 +190,7 @@ const Dashboard = () => {
       case '/students':
         return 'Gestion des Étudiants';
       case '/grades':
-        return 'Gestion des Notes';
+        return role === 'ENSEIGNANT' ? 'Gestion des Notes' : 'Mon Bulletin';
       case '/schedule':
         return 'Emploi du temps';
       case '/scheduler':

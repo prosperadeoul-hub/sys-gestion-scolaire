@@ -13,6 +13,94 @@ from datetime import datetime, date, time, timedelta
 from .models import Etudiant, Note, Matiere, Examen, Professeur, Promotion, User, Salle, Cours
 from .serializers import MatiereSerializer, ExamenSerializer, StudentGradeSerializer, SalleSerializer, CoursSerializer
 
+class StudentBulletinView(APIView):
+    """Retourne le bulletin complet de l'étudiant avec toutes les notes par matière et examen"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            if request.user.role != 'ETUDIANT':
+                return Response({"detail": "Accès réservé aux étudiants."}, status=status.HTTP_403_FORBIDDEN)
+
+            student = Etudiant.objects.get(user=request.user)
+
+            # Récupérer la promotion de l'étudiant
+            promotion = student.promotion
+
+            # Récupérer toutes les matières de la promotion
+            matieres = Matiere.objects.filter(promotions=promotion).select_related('professeur').prefetch_related('examens')
+
+            # Calcul des statistiques globales
+            students_with_avg = Etudiant.objects.filter(promotion=promotion).annotate(
+                moyenne=Avg('notes__valeur')
+            ).annotate(
+                rank=Window(expression=Rank(), order_by=F('moyenne').desc())
+            )
+            my_stats = next((s for s in students_with_avg if s.id == student.id), None)
+
+            # Construire le bulletin
+            matieres_data = []
+            for matiere in matieres:
+                examens_notes = []
+                for examen in matiere.examens.all():
+                    note = Note.objects.filter(etudiant=student, examen=examen).first()
+                    examens_notes.append({
+                        'id': str(examen.id),
+                        'nom': examen.nom,
+                        'date': examen.date_examen,
+                        'note': float(note.valeur) if note and note.valeur is not None else None,
+                        'coefficient': matiere.coefficient,
+                    })
+
+                notes_values = [n['note'] for n in examens_notes if n['note'] is not None]
+                moyenne_matiere = round(sum(notes_values) / len(notes_values), 2) if notes_values else None
+
+                matieres_data.append({
+                    'id': str(matiere.id),
+                    'nom': matiere.nom,
+                    'code': matiere.code,
+                    'coefficient': matiere.coefficient,
+                    'credits': matiere.coefficient * 10,
+                    'professeur': {
+                        'id': str(matiere.professeur.id) if matiere.professeur else None,
+                        'nom': f"{matiere.professeur.user.last_name}" if matiere.professeur else None,
+                    } if matiere.professeur else None,
+                    'examens': examens_notes,
+                    'moyenne': moyenne_matiere,
+                })
+
+            # Calcul moyenne générale
+            total_coeff = sum(m['coefficient'] for m in matieres_data if m['moyenne'] is not None)
+            moyenne_generale = None
+            if total_coeff > 0:
+                moyenne_generale = round(
+                    sum(m['moyenne'] * m['coefficient'] for m in matieres_data if m['moyenne'] is not None) / total_coeff,
+                    2
+                )
+
+            return Response({
+                'etudiant': {
+                    'id': str(student.id),
+                    'nom': f"{student.user.first_name} {student.user.last_name}",
+                    'matricule': student.matricule,
+                    'promotion': {
+                        'id': str(promotion.id) if promotion else None,
+                        'nom': promotion.nom if promotion else None,
+                        'annee': promotion.annee if promotion else None,
+                    } if promotion else None,
+                },
+                'matieres': matieres_data,
+                'moyenne_generale': moyenne_generale,
+                'rang': my_stats.rank if my_stats else None,
+                'total_etudiants': students_with_avg.count() if students_with_avg else None,
+            })
+
+        except Etudiant.DoesNotExist:
+            return Response({"detail": "Profil étudiant non trouvé."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response({"detail": f"Erreur: {str(e)}"}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class StudentDashboardStats(APIView):
     def get(self, request):
         try:
@@ -123,6 +211,17 @@ class StudentScheduleView(APIView):
 
         try:
             student = Etudiant.objects.get(user=request.user)
+
+            # Vérifier si l'étudiant a une promotion
+            if not student.promotion:
+                return Response({
+                    "detail": "Aucune promotion assignée. Contactez l'administration.",
+                    "schedule": {},
+                    "time_slots": [],
+                    "days": [],
+                    "total_courses": 0
+                }, status=status.HTTP_200_OK)
+
             matieres = list(Matiere.objects.filter(promotions=student.promotion).select_related('professeur'))
             print(f"[DEBUG] Student {student.matricule}, Promotion: {student.promotion.nom if student.promotion else 'None'}, Subjects found: {len(matieres)}")
             print(f"[DEBUG] Student {student.matricule} has {len(matieres)} subjects for schedule")

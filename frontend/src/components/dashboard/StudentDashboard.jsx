@@ -49,71 +49,71 @@ const StudentDashboard = ({ stats, user }) => {
           const cours = resp.data.cours || [];
 
          // Récupérer la promotion depuis les données de l'étudiant
-         if (resp.data.etudiant && resp.data.etudiant.promotion) {
-           setPromotion({
-             nom: resp.data.etudiant.promotion.nom,
-             annee: resp.data.etudiant.promotion.annee
-           });
-         }
+          if (resp.data.etudiant && resp.data.etudiant.promotion) {
+            setPromotion({
+              nom: resp.data.etudiant.promotion.nom,
+              annee: resp.data.etudiant.promotion.annee
+            });
+          }
 
          const gData = cours.map(c => ({
-           matiere: (c.nom || '').substring(0, 12) + ((c.nom || '').length > 12 ? '...' : ''),
-           note: c.moyenne != null ? Number(c.moyenne) : 0,
-           coefficient: c.coefficient || 1,
-         }));
-         setGradesData(gData);
+            matiere: (c.nom || '').substring(0, 12) + ((c.nom || '').length > 12 ? '...' : ''),
+            note: c.moyenne != null ? Number(c.moyenne) : 0,
+            coefficient: c.coefficient || 1,
+          }));
+          setGradesData(gData);
 
-         // performanceTrend: aggregate exam dates to compute average per date
-         const examMap = {};
-         cours.forEach(c => {
-           (c.examens || []).forEach(ex => {
-             if (!ex.date) return;
-             const key = ex.date;
-             if (!examMap[key]) examMap[key] = { total: 0, count: 0 };
-             if (ex.note != null) {
-               examMap[key].total += Number(ex.note);
-               examMap[key].count += 1;
-             }
-           });
-         });
-         const perf = Object.keys(examMap).sort().map((date, idx) => ({ 
-           periode: date, 
-           moyenne: examMap[date].count ? Number((examMap[date].total / examMap[date].count).toFixed(2)) : 0 
-         }));
-         setPerformanceTrendData(perf.slice(-8));
+          // performanceTrend: aggregate exam dates to compute average per date
+          const examMap = {};
+          cours.forEach(c => {
+            (c.examens || []).forEach(ex => {
+              if (!ex.date) return;
+              const key = ex.date;
+              if (!examMap[key]) examMap[key] = { total: 0, count: 0 };
+              if (ex.note != null) {
+                examMap[key].total += Number(ex.note);
+                examMap[key].count += 1;
+              }
+            });
+          });
+          const perf = Object.keys(examMap).sort().map((date, idx) => ({ 
+            periode: date, 
+            moyenne: examMap[date].count ? Number((examMap[date].total / examMap[date].count).toFixed(2)) : 0 
+          }));
+          setPerformanceTrendData(perf.slice(-8));
 
-         // Attendance not tracked in DB currently; use stats.attendance if backend provides it
-         if (stats && stats.attendance) {
-           setAttendanceData(stats.attendance);
-         } else {
-           setAttendanceData(null);
-         }
+          // Attendance not tracked in DB currently; use stats.attendance if backend provides it
+          if (stats && stats.attendance) {
+            setAttendanceData(stats.attendance);
+          } else {
+            setAttendanceData(null);
+          }
         } catch (e) {
          // fallback: use matieres list from stats for basic grades chart
-         const fallback = stats?.matieres?.map(m => ({ 
-           matiere: (m.nom||'').substring(0,12), 
-           note: 0, 
-           coefficient: m.coefficient || 1 
-         })) || [];
-         setGradesData(fallback);
-         setPerformanceTrendData([]);
-         setAttendanceData(null);
-       }
-      };
+          const fallback = stats?.matieres?.map(m => ({ 
+            matiere: (m.nom||'').substring(0,12), 
+            note: 0, 
+            coefficient: m.coefficient || 1 
+          })) || [];
+          setGradesData(fallback);
+          setPerformanceTrendData([]);
+          setAttendanceData(null);
+      }
+    };
 
-      buildFromCourses();
-    }, [stats]);
+    buildFromCourses();
+  }, [stats]);
 
-   return (
+  return (
     <div className="dashboard-content-wrapper">
       <div className="welcome-section">
         <h2>
           Bonjour, {user?.full_name || user?.username}
         </h2>
         <p>Tableau de bord Étudiant - Suivez vos performances académiques</p>
-       </div>
+      </div>
 
-       <div className="stats-grid">
+      <div className="stats-grid">
         <div className="stat-card" style={{ borderTopColor: getGradeColor(stats?.moyenne_generale || 0) }}>
           <div className="stat-icon" style={{ color: getGradeColor(stats?.moyenne_generale || 0) }}>
             <TrendingUp />
@@ -243,7 +243,7 @@ const StudentDashboard = ({ stats, user }) => {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div style={{ padding: '1rem' }}>Données d'assiduité non disponibles dans la base.</div>
+            <div style={{ padding: '1rem' }}>Données d'assiduité non disponibles.</div>
           )}
         </div>
       </div>
